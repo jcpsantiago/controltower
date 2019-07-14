@@ -16,7 +16,7 @@
   (:formatted_address (first (get-in map [:results]))))
 
 
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_DEV"))
+(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
 
 (defn post-to-slack [msg url]
   (http/post url {:body (json/generate-string {:text msg})
