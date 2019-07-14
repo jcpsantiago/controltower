@@ -40,14 +40,16 @@
 
 (defn extract-flight
   [clean-flight-data]
-  {:flight (nth clean-flight-data 13)
-   :start (nth clean-flight-data 11)
-   :end (nth clean-flight-data 12)
-   :aircraft (nth clean-flight-data 8)
-   :lat (nth clean-flight-data 1)
-   :lon (nth clean-flight-data 2)
-   :altitude (nth clean-flight-data 4)
-   :speed (int (* (nth clean-flight-data 5) 1.852))})
+  (if (empty? clean-flight-data)
+    {}
+    {:flight (nth clean-flight-data 13)
+     :start (nth clean-flight-data 11)
+     :end (nth clean-flight-data 12)
+     :aircraft (nth clean-flight-data 8)
+     :lat (nth clean-flight-data 1)
+     :lon (nth clean-flight-data 2)
+     :altitude (nth clean-flight-data 4)
+     :speed (int (* (nth clean-flight-data 5) 1.852))}))
 
 (defn create-flight-str
   [flight]
@@ -61,7 +63,10 @@
 
 (defn first-flight
   [clean-flight-data]
-  ((get-first-plane clean-flight-data) clean-flight-data))
+  (if (empty? clean-flight-data)
+    {}
+    ((get-first-plane clean-flight-data) clean-flight-data)))
+
 
 (defn post-flight
   []
@@ -80,21 +85,26 @@
 
 ; return the current flight landing
 (defn which-flight [req]
-  (do
-    (thread (post-flight))
-    {:status 200
-     :body "Doing some quick maths and looking out the window..."}))
+  (println req)
+  (if (= (:command req) "/plane?")
+    (do
+      (thread (post-flight))
+      {:status 200
+       :body (str "Doing some quick maths and looking out the window...")})
+    {:status 400
+     :body (str "Wrong slash command received:" " " (:command req))}))
 
 (defroutes app-routes
   (GET "/" [] simple-body-page)
-  (POST "/which-flight" [] which-flight)
+  (POST "/which-flight" req
+        (let [request (get req :params)]
+          (which-flight request)))
   (GET "/plane" [] (post-flight))
-  (route/not-found "Error: page not found!"))
+  (route/not-found "Error: endpoint not found!"))
 
 (defn -main
   "This is our main entry point"
   [& args]
-  (let [port (Integer/parseInt (or (System/getenv "PORT") "3000"))]
-    (server/run-server #'app-routes {:port port
-                                     :security {:anti-forgery false}})
+  (let [port (Integer/parseInt (or (System/getenv "CONTROL_TOWER_PORT") "3000"))]
+    (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
     (println (str "Running webserver at http:/127.0.0.1:" port "/"))))
