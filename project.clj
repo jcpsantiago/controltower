@@ -9,8 +9,7 @@
                  [ring/ring-defaults "0.3.2"]
                  [org.clojure/data.json "0.2.6"]
                  [proto-repl "0.3.1"]
-                 [org.clojure/core.async "0.4.500"]
-                 [ring/ring-codec "1.1.2"]]
+                 [org.clojure/core.async "0.4.500"]]
   :main ^:skip-aot controltower.core
   :min-lein-version "2.0.0"
   :uberjar-name "controltower.jar"
