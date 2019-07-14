@@ -9,7 +9,14 @@
             [cheshire.core :as json])
   (:gen-class))
 
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
+(def maps_api_key (System/getenv "GOOGLE_MAPS_API_KEY"))
+
+(defn get-address
+  [map]
+  (:formatted_address (first (get-in map [:results]))))
+
+
+(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_DEV"))
 
 (defn post-to-slack [msg url]
   (http/post url {:body (json/generate-string {:text msg})
@@ -25,23 +32,14 @@
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
-;; Not sure if needed, but it's what flighradar24 sends in the API call
-;; need to look at other data sources like OpenskyNetwork
-(def options {:user-agent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.14; rv:66.0) Gecko/20100101 Firefox/66.0"
-              :headers {"Host" "data-live.flightradar24.com"
-                        "Accept" "application/json, text/javascript, */*; q=0.01"
-                        "Accept-Language" "en-US,en;q=0.5"
-                        "Referer" "https://www.flightradar24.com/52.56,13.35/13"
-                        "Origin" "https://www.flightradar24.com"
-                        "DNT" "1"
-                        "Connection" "keep-alive"
-                        "TE" "Trailers"}})
-
-(defn get-flight-data []
+(defn get-api-data
+  [url]
   (json/parse-string
-   (:body @(http/get "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46"
-                     options))
+   (:body @(http/get url))
    true))
+
+(json/parse-string
+ (:body @(http/get "https://maps.googleapis.com/maps/api/geocode/json?latlng=52.5765,13.4594&key=AIzaSyCRQ1Xbjie-kGTLswPBPcELy0RhIw_lrmk")) true)
 
 (defn remove-crud [flight-data] (dissoc flight-data :full_count :version))
 
@@ -69,7 +67,11 @@
          " (" (:aircraft flight) ") "
          "from " (iata->city (:start flight)) " (" (:start flight) ")"
          " to " (iata->city (:end flight)) " (" (:end flight) ")"
-         " currently at " (:lat flight)"," (:lon flight)
+         " currently over "
+         (get-address
+          (get-api-data
+            (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
+                 (:lat flight)"," (:lon flight) "&key=" maps_api_key)))
          " moving at " (:speed flight) " km/h.")))
 
 (defn first-flight
@@ -81,7 +83,7 @@
 
 (defn post-flight
   []
-  (-> (get-flight-data)
+  (-> (get-api-data "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46")
       remove-crud
       first-flight
       extract-flight
