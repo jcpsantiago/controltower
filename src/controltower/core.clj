@@ -5,15 +5,25 @@
             [compojure.route :as route]
             [ring.middleware.defaults :refer :all]
             [clojure.string :as str]
-            [clojure.data.json :as json]
-            [clojure.core.async :refer [thread]])
+            [clojure.core.async :refer [thread]]
+            [cheshire.core :as json])
   (:gen-class))
 
 (def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
 
 (defn post-to-slack [msg url]
-  (http/post url {:body (json/write-str {:text msg})
+  (http/post url {:body (json/generate-string {:text msg})
                   :content-type :json}))
+
+;; list of airports from https://datahub.io/core/airport-codes#data
+;; under Public Domain Dedication and License
+(def all-airports
+  (json/parsed-seq (clojure.java.io/reader "resources/airport-codes_json.json")
+                   true))
+
+(defn iata->city
+  [iata]
+  (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
 ;; Not sure if needed, but it's what flighradar24 sends in the API call
 ;; need to look at other data sources like OpenskyNetwork
@@ -28,10 +38,10 @@
                         "TE" "Trailers"}})
 
 (defn get-flight-data []
-  (json/read-str
+  (json/parse-string
    (:body @(http/get "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46"
                      options))
-   :key-fn keyword))
+   true))
 
 (defn remove-crud [flight-data] (dissoc flight-data :full_count :version))
 
@@ -57,7 +67,8 @@
     "Besides some clouds, not much too see in the sky right now. Ask me again later."
     (str "Flight " (:flight flight)
          " (" (:aircraft flight) ") "
-         "from " (:start flight) " to " (:end flight)
+         "from " (iata->city (:start flight)) " (" (:start flight) ")"
+         " to " (iata->city (:end flight)) " (" (:end flight) ")"
          " currently at " (:lat flight)"," (:lon flight)
          " moving at " (:speed flight) " km/h.")))
 
