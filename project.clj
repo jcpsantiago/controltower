@@ -12,5 +12,7 @@
                  [org.clojure/core.async "0.4.500"]
                  [ring/ring-codec "1.1.2"]]
   :main ^:skip-aot controltower.core
+  :min-lein-version "2.0.0"
+  :uberjar-name "controltower.jar"
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
