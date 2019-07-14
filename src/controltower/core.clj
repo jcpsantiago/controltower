@@ -105,6 +105,6 @@
 (defn -main
   "This is our main entry point"
   [& args]
-  (let [port (Integer/parseInt (or (System/getenv "CONTROL_TOWER_PORT") "3000"))]
+  (let [port (Integer/parseInt (or (System/getenv "PORT") "3000"))]
     (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
     (println (str "Running webserver at http:/127.0.0.1:" port "/"))))
