@@ -38,9 +38,6 @@
    (:body @(http/get url))
    true))
 
-(json/parse-string
- (:body @(http/get "https://maps.googleapis.com/maps/api/geocode/json?latlng=52.5765,13.4594&key=AIzaSyCRQ1Xbjie-kGTLswPBPcELy0RhIw_lrmk")) true)
-
 (defn remove-crud [flight-data] (dissoc flight-data :full_count :version))
 
 (defn get-first-plane [clean-flight-data]
