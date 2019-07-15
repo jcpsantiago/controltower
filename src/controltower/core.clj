@@ -4,19 +4,18 @@
             [compojure.core :refer :all]
             [compojure.route :as route]
             [ring.middleware.defaults :refer :all]
-            [clojure.string :as str]
             [clojure.core.async :refer [thread]]
             [cheshire.core :as json])
   (:gen-class))
 
-(def maps_api_key (System/getenv "GOOGLE_MAPS_API_KEY"))
+(def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
+(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
+(def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 
 (defn get-address
-  [map]
-  (:formatted_address (first (get-in map [:results]))))
-
-
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
+  "Get address from google maps api reverse geocoding"
+  [m]
+  (:formatted_address (first (get m [:results]))))
 
 (defn post-to-slack [msg url]
   (http/post url {:body (json/generate-string {:text msg})
@@ -29,6 +28,7 @@
                    true))
 
 (defn iata->city
+  "Matches a IATA code to the city name"
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
@@ -38,7 +38,9 @@
    (:body @(http/get url))
    true))
 
-(defn remove-crud [flight-data] (dissoc flight-data :full_count :version))
+(defn remove-crud
+  [flight-data]
+  (dissoc flight-data :full_count :version))
 
 (defn get-first-plane [clean-flight-data]
   (first (keys clean-flight-data)))
@@ -68,7 +70,7 @@
          (get-address
           (get-api-data
             (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-                 (:lat flight)"," (:lon flight) "&key=" maps_api_key)))
+                 (:lat flight)"," (:lon flight) "&key=" maps-api-key)))
          " moving at " (:speed flight) " km/h.")))
 
 (defn first-flight
@@ -79,6 +81,7 @@
 
 
 (defn post-flight
+  ""
   []
   (-> (get-api-data "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46")
       remove-crud
@@ -87,14 +90,16 @@
       create-flight-str
       (post-to-slack hook-url)))
 
-; Simple Body Page
-(defn simple-body-page [req]
+(defn simple-body-page
+  [req]
+  "Simple page for healthchecks"
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "Hello World"})
 
-; return the current flight landing
-(defn which-flight [req]
+(defn which-flight
+  "Return the current flight"
+  [req]
   (println req)
   (if (= (:command req) "/plane?")
     (do
@@ -109,12 +114,10 @@
   (POST "/which-flight" req
         (let [request (get req :params)]
           (which-flight request)))
-  (GET "/plane" [] (post-flight))
   (route/not-found "Error: endpoint not found!"))
 
 (defn -main
   "This is our main entry point"
   [& args]
-  (let [port (Integer/parseInt (or (System/getenv "PORT") "3000"))]
-    (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
-    (println (str "Running webserver at http:/127.0.0.1:" port "/"))))
+  (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
+  (println (str "Running webserver at http:/127.0.0.1:" port "/")))
