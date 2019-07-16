@@ -8,8 +8,9 @@
             [cheshire.core :as json])
   (:gen-class))
 
+(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_DEV"))
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
+(def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 
 (defn get-address
@@ -38,6 +39,14 @@
    (:body @(http/get url))
    true))
 
+(defn get-weather
+  [city]
+  (:description
+   (first (:weather
+            (get-api-data
+              (str "http://api.openweathermap.org/data/2.5/weather?q=" city
+                   "&appid=" openweather-api-key))))))
+
 (defn remove-crud
   [flight-data]
   (dissoc flight-data :full_count :version))
@@ -61,7 +70,9 @@
 (defn create-flight-str
   [flight]
   (if (empty? flight)
-    "Besides some clouds, not much too see in the sky right now. Ask me again later."
+    (str "Besides some " (get-weather "Berlin")
+      ", not much too see in the sky right now. Ask me again later.")
+
     (str "Flight " (:flight flight)
          " (" (:aircraft flight) ") "
          "from " (iata->city (:start flight)) " (" (:start flight) ")"
