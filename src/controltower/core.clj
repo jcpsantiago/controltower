@@ -16,7 +16,7 @@
 (defn get-address
   "Get address from google maps api reverse geocoding"
   [m]
-  (:formatted_address (first (get m [:results]))))
+  (:formatted_address (first (get m :results))))
 
 (defn post-to-slack [msg url]
   (http/post url {:body (json/generate-string {:text msg})
