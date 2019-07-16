@@ -8,7 +8,7 @@
             [cheshire.core :as json])
   (:gen-class))
 
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_DEV"))
+(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
@@ -40,6 +40,7 @@
    true))
 
 (defn get-weather
+  "Get current weather condition for a city"
   [city]
   (:description
    (first (:weather
