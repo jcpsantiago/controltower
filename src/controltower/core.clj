@@ -24,11 +24,13 @@
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
+
 (defn post-to-slack
   "Post message to Slack"
-  [msg url]
-  (http/post url {:body (json/generate-string {:text msg})
-                  :content-type :json}))
+  [payload url]
+  (http/post url
+    {:body (json/generate-string payload)}
+    :content-type :json))
 
 (defn get-api-data
   "GET an API and pull only the body"
@@ -87,11 +89,7 @@
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight]
-  (if (empty? flight)
-    (str "Besides some " (get-weather "Berlin")
-      ", not much too see in the sky right now. Ask me again later.")
-
-    (str "Flight " (:flight flight)
+  (str "Flight " (:flight flight)
          " (" (:aircraft flight) ") "
          "from " (iata->city (:start flight)) " (" (:start flight) ")"
          " to " (iata->city (:end flight)) " (" (:end flight) ")"
@@ -101,7 +99,22 @@
                     (get-api-data
                       (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                            (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
-        ".")))
+        "."))
+
+(defn create-payload
+  "Create a map to be converted into JSON for POST"
+  [flight]
+  (if (empty? flight)
+    {:text (str "Besides some " (get-weather "Berlin")
+             ", not much too see in the sky right now. Ask me again later.")}
+    {:text (create-flight-str flight)
+     :attachments
+       [{:text ""
+         :color "good"
+         :image_url (str "https://maps.googleapis.com/maps/api/staticmap?center="
+                         (:lat flight) "," (:lon flight)
+                         "&zoom=13&size=200x200&maptype=roadmap&key="
+                         maps-api-key)}]}))
 
 (defn get-flight
   "Calls flightradar24m cleans the data and extracts the first flight"
@@ -115,7 +128,7 @@
   "Gets flight, create string and post it to Slack"
   []
   (-> (get-flight)
-      create-flight-str
+      create-payload
       (post-to-slack hook-url)))
 
 
