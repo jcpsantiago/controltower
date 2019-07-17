@@ -13,15 +13,6 @@
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 
-(defn get-address
-  "Get address from google maps api reverse geocoding"
-  [m]
-  (:formatted_address (first (get m :results))))
-
-(defn post-to-slack [msg url]
-  (http/post url {:body (json/generate-string {:text msg})
-                  :content-type :json}))
-
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
 (def all-airports
@@ -33,7 +24,14 @@
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
+(defn post-to-slack
+  "Post message to Slack"
+  [msg url]
+  (http/post url {:body (json/generate-string {:text msg})
+                  :content-type :json}))
+
 (defn get-api-data
+  "GET an API and pull only the body"
   [url]
   (json/parse-string
    (:body @(http/get url))
@@ -48,14 +46,32 @@
               (str "http://api.openweathermap.org/data/2.5/weather?q=" city
                    "&appid=" openweather-api-key))))))
 
+(defn get-address
+  "Get address from google maps api reverse geocoding"
+  [m]
+  (:formatted_address (first (get m :results))))
+
+
+;; extracting info from flightradar24 API and cleaning everying
 (defn remove-crud
+  "Remove irrelevant fields from flightradar24"
   [flight-data]
   (dissoc flight-data :full_count :version))
 
-(defn get-first-plane [clean-flight-data]
+(defn get-first-plane
+  "Get the keyword for the first plane"
+  [clean-flight-data]
   (first (keys clean-flight-data)))
 
+(defn first-flight
+  "Get data for the first plane in the list"
+  [clean-flight-data]
+  (if (empty? clean-flight-data)
+    {}
+    ((get-first-plane clean-flight-data) clean-flight-data)))
+
 (defn extract-flight
+  "Extract the flight information and create a map with appropriate keywords"
   [clean-flight-data]
   (if (empty? clean-flight-data)
     {}
@@ -69,6 +85,7 @@
      :speed (int (* (nth clean-flight-data 5) 1.852))}))
 
 (defn create-flight-str
+  "Creates a string with information about the flight"
   [flight]
   (if (empty? flight)
     (str "Besides some " (get-weather "Berlin")
@@ -78,33 +95,34 @@
          " (" (:aircraft flight) ") "
          "from " (iata->city (:start flight)) " (" (:start flight) ")"
          " to " (iata->city (:end flight)) " (" (:end flight) ")"
-         " currently over "
-         (get-address
-          (get-api-data
-            (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-                 (:lat flight)"," (:lon flight) "&key=" maps-api-key)))
-         " moving at " (:speed flight) " km/h.")))
+         " currently moving at " (:speed flight) " km/h over "
+         (re-find #"[^,]*"
+                  (get-address
+                    (get-api-data
+                      (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
+                           (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
+        ".")))
 
-(defn first-flight
-  [clean-flight-data]
-  (if (empty? clean-flight-data)
-    {}
-    ((get-first-plane clean-flight-data) clean-flight-data)))
-
-
-(defn post-flight
-  ""
+(defn get-flight
+  "Calls flightradar24m cleans the data and extracts the first flight"
   []
   (-> (get-api-data "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46")
       remove-crud
       first-flight
-      extract-flight
-      create-flight-str
-      (post-to-slack hook-url)))
+      extract-flight))
 
+(defn post-flight
+  "Gets flight, create string and post it to Slack"
+  []
+  (-> (get-flight)
+      create-flight-str))
+      ;;(post-to-slack hook-url)))
+
+
+;; routes and handlers
 (defn simple-body-page
-  [req]
   "Simple page for healthchecks"
+  [req]
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "Hello World"})
