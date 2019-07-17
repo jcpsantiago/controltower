@@ -115,8 +115,8 @@
   "Gets flight, create string and post it to Slack"
   []
   (-> (get-flight)
-      create-flight-str))
-      ;;(post-to-slack hook-url)))
+      create-flight-str
+      (post-to-slack hook-url)))
 
 
 ;; routes and handlers
