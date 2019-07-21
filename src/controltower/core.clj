@@ -15,6 +15,7 @@
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
+;; encoding is problematic, so I rolled my own json from the csv file
 (def all-airports
   (json/parsed-seq (clojure.java.io/reader "resources/airport-codes_json.json")
                    true))
