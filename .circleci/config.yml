@@ -2,9 +2,14 @@
 #
 # Check https://circleci.com/docs/2.0/language-clojure/ for more details
 #
-version: 2
+version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.5
 jobs:
   build:
+    steps:
+      - codecov/upload:
+          file: {{ coverage_report_filepath }}
     docker:
       # specify the version you desire here
       - image: circleci/clojure:lein-2.7.1
