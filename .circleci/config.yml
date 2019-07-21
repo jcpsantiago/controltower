@@ -5,7 +5,6 @@
 version: 2.1
 orbs:
   kaocha: lambdaisland/kaocha@dev:first
-  clojure: lambdaisland/clojure@dev:first
 jobs:
   build:
     docker:
@@ -26,15 +25,12 @@ jobs:
 
     steps:
       - checkout
-      - clojure/with_cache:
-          steps:
-            - run: clojure -e '(println (System/getProperty "java.runtime.name") (System/getProperty "java.runtime.version") "\nClojure" (clojure-version))'
-            - kaocha/execute:
-                args: "unit --reporter documentation --plugin cloverage --codecov"
-            - kaocha/upload_codecov:
-                flags: unit
-            - kaocha/execute:
-                args: "integration --reporter documentation --plugin cloverage --codecov"
+      - kaocha/execute:
+            args: "unit --reporter documentation --plugin cloverage --codecov"
+      - kaocha/upload_codecov:
+          flags: unit
+      - kaocha/execute:
+          args: "integration --reporter documentation --plugin cloverage --codecov"
       - kaocha/upload_codecov:
           flags: integration
           file: target/coverage/integration*/codecov.json
