@@ -4,12 +4,12 @@
 #
 version: 2.1
 orbs:
-  kaocha: lambdaisland/kaocha@dev:first
+  codecov: codecov/codecov@1.0.5
 jobs:
   build:
     docker:
       # specify the version you desire here
-      - image: circleci/clojure:lein-2.9.1
+      - image: circleci/clojure:lein-2.8.1
 
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -25,15 +25,6 @@ jobs:
 
     steps:
       - checkout
-      - kaocha/execute:
-            args: "unit --reporter documentation --plugin cloverage --codecov"
-      - kaocha/upload_codecov:
-          flags: unit
-      - kaocha/execute:
-          args: "integration --reporter documentation --plugin cloverage --codecov"
-      - kaocha/upload_codecov:
-          flags: integration
-          file: target/coverage/integration*/codecov.json
 
       # Download and cache dependencies
       - restore_cache:
@@ -50,4 +41,6 @@ jobs:
           key: v1-dependencies-{{ checksum "project.clj" }}
 
       # run tests!
-      - run: lein test
+      - run: lein cloverage --codecov
+      - codecov/upload:
+          file: target/coverage/codecov.json

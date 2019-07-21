@@ -11,10 +11,9 @@
                  [proto-repl "0.3.1"]
                  [org.clojure/core.async "0.4.500"]
                  [cheshire "5.8.1"]]
+  :plugins [[lein-cloverage "1.1.1"]]
   :main ^:skip-aot controltower.core
   :min-lein-version "2.0.0"
   :uberjar-name "controltower.jar"
   :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}
-             :kaocha {:dependencies [[lambdaisland/kaocha "0.0-529"]]}}
-  :aliases {"kaocha" ["with-profile" "+kaocha" "run" "-m" "kaocha.runner"]})
+  :profiles {:uberjar {:aot :all}})
