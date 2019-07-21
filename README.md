@@ -4,3 +4,5 @@
 
 # Control Tower
 We saw flights landing in nearby Tegel airport from our office, and wondered where all those airplanes came from. So I made this, and now we just ask Slack for answers. Also learned some Clojure.
+
+![screenshot](./resources/screenshot.png)
