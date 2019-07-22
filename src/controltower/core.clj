@@ -12,6 +12,7 @@
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
+(def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
@@ -100,7 +101,7 @@
                     (get-api-data
                       (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                            (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
-        "."))
+       "."))
 
 (defn create-payload
   "Create a map to be converted into JSON for POST"
@@ -112,10 +113,12 @@
      :attachments
        [{:text ""
          :color "good"
-         :image_url (str "https://maps.googleapis.com/maps/api/staticmap?center="
-                         (:lat flight) "," (:lon flight)
-                         "&zoom=13&size=200x200&maptype=roadmap&key="
-                         maps-api-key)}]}))
+         :image_url (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
+                         "url-https%3A%2F%2Foi1380.photobucket.com%2Falbums%2Fah168%2Fjcpsantiago%2Fplane_small_zps1isdnvbc.png%7Eoriginal"
+                         "(" (:lon flight) "," (:lat flight) ")/"
+                         (:lon flight) "," (:lat flight)
+                         ",14,80,0/200x200?attribution=false&logo=false&access_token="
+                         mapbox-api-key)}]}))
 
 (defn get-flight
   "Calls flightradar24m cleans the data and extracts the first flight"
