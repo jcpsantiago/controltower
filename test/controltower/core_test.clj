@@ -14,3 +14,8 @@
             :title "maiores aut nesciunt delectus exercitationem vel assumenda eligendi at",
             :id 77,
             :userId 4}))))
+
+(deftest parse-json-files
+  (testing "read json files correctly"
+    (is (= (parse-json "test/controltower/json-file-testing.json")
+           '({:completed false, :title "delectus aut autem", :id 1, :userId 1})))))
