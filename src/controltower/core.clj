@@ -14,12 +14,16 @@
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 
+(defn parse-json
+  [file]
+  (json/parsed-seq (clojure.java.io/reader file)
+                   true))
+
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
 ;; encoding is problematic, so I rolled my own json from the csv file
-(def all-airports
-  (json/parsed-seq (clojure.java.io/reader "resources/airport-codes_json.json")
-                   true))
+(def all-airports (parse-json "resources/airport-codes_json.json"))
+
 
 (defn iata->city
   "Matches a IATA code to the city name"
