@@ -34,9 +34,11 @@
 (defn post-to-slack
   "Post message to Slack"
   [payload url]
-  (http/post url
-    {:body (json/generate-string payload)}
-    :content-type :json))
+  (do
+    (http/post url
+      {:body (json/generate-string payload)}
+      :content-type :json)
+    (println "Report sent to Slack.")))
 
 (defn get-api-data
   "GET an API and pull only the body"
@@ -163,8 +165,11 @@
 (defroutes app-routes
   (GET "/" [] simple-body-page)
   (POST "/which-flight" req
-        (let [request (get req :params)]
-          (which-flight request)))
+        (do
+          (println "Request received! Checking for flights...")
+          (let [request (get req :params)]
+            (which-flight request))))
+
   (route/not-found "Error: endpoint not found!"))
 
 (defn -main
