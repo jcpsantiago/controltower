@@ -105,7 +105,7 @@
                     (get-api-data
                       (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                            (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
-       "."))
+       " at an altitude of " (:altitude flight) " meters."))
 
 (defn create-payload
   "Create a map to be converted into JSON for POST"
