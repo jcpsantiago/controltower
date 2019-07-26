@@ -89,7 +89,7 @@
      :aircraft (nth clean-flight-data 8)
      :lat (nth clean-flight-data 1)
      :lon (nth clean-flight-data 2)
-     :altitude (/ (nth clean-flight-data 4) 3.281)
+     :altitude (int (/ (nth clean-flight-data 4) 3.281))
      :speed (int (* (nth clean-flight-data 5) 1.852))}))
 
 (defn create-flight-str
