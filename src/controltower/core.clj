@@ -114,7 +114,7 @@
   [flight]
   (if (empty? flight)
     {:text (str "Besides some " (get-weather "Berlin")
-             ", not much too see in the sky right now. Ask me again later.")}
+             ", not much going on right now. Ask me again later.")}
     {:text (create-flight-str flight)
      :attachments
        [{:text ""
@@ -169,7 +169,6 @@
           (println "Request received! Checking for flights...")
           (let [request (get req :params)]
             (which-flight request))))
-
   (route/not-found "Error: endpoint not found!"))
 
 (defn -main
