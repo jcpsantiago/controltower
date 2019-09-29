@@ -10,7 +10,8 @@
                  [org.clojure/data.json "0.2.6"]
                  [proto-repl "0.3.1"]
                  [org.clojure/core.async "0.4.500"]
-                 [cheshire "5.8.1"]]
+                 [cheshire "5.8.1"]
+                 [com.taoensso/timbre "4.10.0"]]
   :plugins [[lein-cloverage "1.1.1"]]
   :main ^:skip-aot controltower.core
   :min-lein-version "2.0.0"

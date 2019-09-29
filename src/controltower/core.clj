@@ -5,7 +5,8 @@
             [compojure.route :as route]
             [ring.middleware.defaults :refer :all]
             [clojure.core.async :refer [thread]]
-            [cheshire.core :as json])
+            [cheshire.core :as json]
+            [taoensso.timbre :as timbre])
   (:gen-class))
 
 (def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
@@ -31,15 +32,20 @@
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
 
+(defn log-http-status
+  [{:keys [status body error]} service type]
+  (if (not (= status 200))
+    (timbre/error "Failed, exception is" body)
+    (timbre/info (str service " async HTTP " type " success: ") status)))
 
 (defn post-to-slack
   "Post message to Slack"
   [payload url]
-  (do
-    (http/post url
-      {:body (json/generate-string payload)}
-      :content-type :json)
-    (println "Report sent to Slack.")))
+  (-> @(http/post
+        url
+        {:body (json/generate-string payload)
+         :content-type :json})
+      (log-http-status "Slack" "POST")))
 
 (defn get-api-data
   "GET an API and pull only the body"
@@ -51,6 +57,7 @@
 (defn get-weather
   "Get current weather condition for a city"
   [city]
+  (timbre/info "Checking the weather...")
   (:description
    (first (:weather
             (get-api-data
@@ -60,6 +67,7 @@
 (defn get-address
   "Get address from google maps api reverse geocoding"
   [m]
+  (timbre/info "Getting the address with google maps geocoding...")
   (:formatted_address (first (get m :results))))
 
 
@@ -161,21 +169,22 @@
 (defn which-flight
   "Return the current flight"
   [req]
-  (println req)
   (if (= (:command req) "/plane?")
     (do
       (thread (post-flight))
       {:status 200
-       :body (str "Doing some quick maths and looking out the window...")})
+       :body (str "Doing some quick maths and looking out the window...")}
+      (timbre/info "Immediate slack reply sent."))
     {:status 400
-     :body (str "Wrong slash command received:" " " (:command req))}))
+     :body (str "Wrong slash command received: " (:command req))}))
 
 (defroutes app-routes
   (GET "/" [] simple-body-page)
   (POST "/which-flight" req
-        (do
-          (println "Request received! Checking for flights...")
-          (let [request (get req :params)]
+        (let [request (get req :params)]
+          (do
+            (timbre/info (str "Slack user " (:user_name request)
+                              " is requesting info. Checking for flights..."))
             (which-flight request))))
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
@@ -184,4 +193,4 @@
   "This is our main entry point"
   [& args]
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
-  (println (str "Running webserver at http:/127.0.0.1:" port "/")))
+  (timbre/info (str "Running webserver at http:/127.0.0.1:" port "/" 🔥)))
