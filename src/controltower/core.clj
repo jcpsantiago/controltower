@@ -193,4 +193,4 @@
   "This is our main entry point"
   [& args]
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
-  (timbre/info (str "Running webserver at http:/127.0.0.1:" port "/" 🔥)))
+  (timbre/info (str "Running webserver at http:/127.0.0.1:" port "/")))
