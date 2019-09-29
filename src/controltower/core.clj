@@ -13,6 +13,7 @@
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
+(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane.png")
 
 (defn parse-json
   [file]
@@ -113,7 +114,7 @@
   "Creates mapbox string for image with map and airplane"
   [longitude latitude api-key]
   (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
-       "url-https%3A%2F%2Foi1380.photobucket.com%2Falbums%2Fah168%2Fjcpsantiago%2Fplane_small_zps1isdnvbc.png%7Eoriginal"
+       "url-" airplane-img-url
        "(" longitude "," latitude ")/"
        longitude "," latitude
        ",14,80,0/200x200?attribution=false&logo=false&access_token="
