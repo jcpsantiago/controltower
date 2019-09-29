@@ -13,7 +13,7 @@
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
-(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane.png")
+(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane_small.png")
 
 (defn parse-json
   [file]
