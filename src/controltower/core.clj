@@ -109,6 +109,16 @@
                            (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
        " at an altitude of " (:altitude flight) " meters."))
 
+(defn create-mapbox-str
+  "Creates mapbox string for image with map and airplane"
+  [longitude latitude api-key]
+  (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
+       "url-https%3A%2F%2Foi1380.photobucket.com%2Falbums%2Fah168%2Fjcpsantiago%2Fplane_small_zps1isdnvbc.png%7Eoriginal"
+       "(" longitude "," latitude ")/"
+       longitude "," latitude
+       ",14,80,0/200x200?attribution=false&logo=false&access_token="
+       api-key))
+
 (defn create-payload
   "Create a map to be converted into JSON for POST"
   [flight]
@@ -119,12 +129,9 @@
      :attachments
        [{:text ""
          :color "good"
-         :image_url (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
-                         "url-https%3A%2F%2Foi1380.photobucket.com%2Falbums%2Fah168%2Fjcpsantiago%2Fplane_small_zps1isdnvbc.png%7Eoriginal"
-                         "(" (:lon flight) "," (:lat flight) ")/"
-                         (:lon flight) "," (:lat flight)
-                         ",14,80,0/200x200?attribution=false&logo=false&access_token="
-                         mapbox-api-key)}]}))
+         :image_url (create-mapbox-str (:lon flight)
+                                       (:lat flight)
+                                       mapbox-api-key)}]}))
 
 (defn get-flight
   "Calls flightradar24m cleans the data and extracts the first flight"
