@@ -176,6 +176,7 @@
           (println "Request received! Checking for flights...")
           (let [request (get req :params)]
             (which-flight request))))
+  (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 
 (defn -main
