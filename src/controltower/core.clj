@@ -172,9 +172,9 @@
   (if (= (:command req) "/plane?")
     (do
       (thread (post-flight))
+      (timbre/info "Replying immediately to slack")
       {:status 200
-       :body (str "Doing some quick maths and looking out the window...")}
-      (timbre/info "Immediate slack reply sent."))
+       :body (str "Doing some quick maths and looking out the window...")})
     {:status 400
      :body (str "Wrong slash command received: " (:command req))}))
 
@@ -183,7 +183,7 @@
   (POST "/which-flight" req
         (let [request (get req :params)]
           (do
-            (timbre/info (str "Slack user " (:user_name request)
+            (timbre/info (str "Slack user " (:user_id request)
                               " is requesting info. Checking for flights..."))
             (which-flight request))))
   (route/resources "/")
