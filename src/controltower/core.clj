@@ -224,7 +224,6 @@
           {:status 200
            :body ""})
         (do
-          (println flight-direction)
           (thread (post-flight airport flight-direction response-url))
           (timbre/info "Replying immediately to slack")
           {:status 200
@@ -251,6 +250,7 @@
                               " is requesting info. Checking for flights at "
                               airport "..."))
             (which-flight user-id airport command-text response-url))))
+
   (POST "/which-flight-retry" req
         (let [request (-> req
                           :params
