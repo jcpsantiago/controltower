@@ -6,7 +6,8 @@
             [ring.middleware.defaults :refer :all]
             [clojure.core.async :refer [thread]]
             [cheshire.core :as json]
-            [taoensso.timbre :as timbre])
+            [taoensso.timbre :as timbre]
+            [clojure.string :as str])
   (:gen-class))
 
 (def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
@@ -26,6 +27,16 @@
 ;; encoding is problematic, so I rolled my own json from the csv file
 (def all-airports (parse-json "resources/airport-codes_json.json"))
 
+;; from https://boundingbox.klokantech.com
+(def bounding-boxes
+  {:txl {:e "52.575821,52.556915,13.317147,13.405261"
+         :w "52.561077,52.543694,13.182475,13.249971"}})
+
+(defn get-bounding-box
+  [airport flight-direction]
+  (-> bounding-boxes
+      airport
+      flight-direction))
 
 (defn iata->city
   "Matches a IATA code to the city name"
@@ -132,8 +143,8 @@
   "Create a map to be converted into JSON for POST"
   [flight]
   (if (empty? flight)
-    {:text (str "Besides some " (get-weather "Berlin")
-             ", not much going on right now. Ask me again later.")}
+    {:text (str "Tower observes " (get-weather "Berlin")
+                ", no air traffic, over.")}
     {:text (create-flight-str flight)
      :attachments
        [{:text ""
@@ -144,18 +155,44 @@
 
 (defn get-flight
   "Calls flightradar24m cleans the data and extracts the first flight"
-  []
-  (-> (get-api-data "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds=52.59,52.55,13.33,13.46")
+  [airport flight-direction]
+  (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
+           (get-bounding-box airport flight-direction))
+      get-api-data
       remove-crud
       first-flight
       extract-flight))
 
+
 (defn post-flight
   "Gets flight, create string and post it to Slack"
-  []
-  (-> (get-flight)
+  [airport flight-direction]
+  (-> (get-flight airport flight-direction)
       create-payload
       (post-to-slack hook-url)))
+
+(defn request-flight-direction
+  [airport user-id]
+  {:status 200
+   :blocks [{:type "section"
+             :text {:type "mrkdwn"
+                    :text (str "This is `" (name airport)
+                               "` to user " user-id
+                               " say again!")}}
+            {:type "actions"
+             ;;FIXME should automatically get this from bouncing-boxes
+             :elements [{:type "button"
+                         :text {:type "plain_text"
+                                :text "East"
+                                :emoji false}
+                         :value "e"
+                         :action_id "txl-east"}
+                        {:type "button",
+                         :text {:type "plain_text"
+                                :text "West"
+                                :emoji false},
+                         :value "w"
+                         :action_id "txl-west"}]}]})
 
 
 ;; routes and handlers
@@ -168,24 +205,65 @@
 
 (defn which-flight
   "Return the current flight"
-  [req]
-  (if (= (:command req) "/plane?")
+  [user-id airport command-text response-url]
+  (if (and (contains? bounding-boxes airport)
+           (not (empty? command-text)))
+    (let [flight-direction (keyword
+                            (first
+                             (re-matches #"(?i)(^e{1}$)|(^w{1}$)"
+                                         command-text)))]
+      (if (nil? flight-direction)
+        (do
+          (timbre/error "Invalid flight direction!")
+          (thread (post-to-slack (request-flight-direction airport user-id)
+                                 response-url))
+          {:status 200
+           :body ""})
+        (do
+          (println flight-direction)
+          (thread (post-flight airport flight-direction))
+          (timbre/info "Replying immediately to slack")
+          {:status 200
+           :body (str "User " user-id " standby...")})))
     (do
-      (thread (post-flight))
-      (timbre/info "Replying immediately to slack")
+      ;;NOTE the slash command is already set on slack
+      (timbre/error "Flight direction is missing! Asking for more info...")
+      (thread (post-to-slack (request-flight-direction airport user-id)
+                             hook-url))
       {:status 200
-       :body (str "Doing some quick maths and looking out the window...")})
-    {:status 400
-     :body (str "Wrong slash command received: " (:command req))}))
+       :body ""})))
+
 
 (defroutes app-routes
   (GET "/" [] simple-body-page)
   (POST "/which-flight" req
-        (let [request (get req :params)]
+        (let [request (:params req)
+              user-id (:user_id request)
+              airport (keyword (re-find #"[a-z]+" (:command request)))
+              command-text (:text request)
+              response-url (:response_url request)]
           (do
-            (timbre/info (str "Slack user " (:user_id request)
-                              " is requesting info. Checking for flights..."))
-            (which-flight request))))
+            (timbre/info (str "Slack user " user-id
+                              " is requesting info. Checking for flights at "
+                              airport "..."))
+            (which-flight user-id airport command-text response-url))))
+  (POST "/which-flight-retry" req
+        (let [request (-> req
+                          :params
+                          :payload
+                          (json/parse-string true))
+              user-id (:id (:user request))
+              received-action (first (:actions request))
+              airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
+              flight-direction (keyword (:value received-action))]
+          (do
+            (timbre/info (str "Slack user " user-id
+                              " is retrying. Checking for flights at "
+                              airport "..."))
+            (thread (post-flight airport flight-direction))
+            {:status 200
+             :body ""})))
+
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 
@@ -193,4 +271,4 @@
   "This is our main entry point"
   [& args]
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
-  (timbre/info (str "Running webserver at http:/127.0.0.1:" port "/")))
+  (timbre/info (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
