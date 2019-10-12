@@ -1,4 +1,4 @@
-(defproject jcpsantiago.controltower "1.0.0"
+(defproject jcpsantiago.controltower "1.1.0"
   :description "Slack app that tells you which flight is landing"
   :url "https://github.com/jcpsantiago/controltower"
   :license {:name "EPL-2.0"

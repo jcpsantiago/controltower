@@ -10,7 +10,6 @@
             [clojure.string :as str])
   (:gen-class))
 
-(def hook-url (System/getenv "CONTROL_TOWER_WEBHOOK_PROD"))
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
@@ -143,7 +142,7 @@
   "Create a map to be converted into JSON for POST"
   [flight]
   (if (empty? flight)
-    {:text (str "Tower observes " (get-weather "Berlin")
+    {:text (str "Tower observes " (get-weather "Berlin") ;;FIXME generalize
                 ", no air traffic, over.")}
     {:text (create-flight-str flight)
      :attachments
@@ -166,10 +165,10 @@
 
 (defn post-flight
   "Gets flight, create string and post it to Slack"
-  [airport flight-direction]
+  [airport flight-direction response-url]
   (-> (get-flight airport flight-direction)
       create-payload
-      (post-to-slack hook-url)))
+      (post-to-slack response-url)))
 
 (defn request-flight-direction
   [airport user-id]
@@ -229,7 +228,7 @@
       ;;NOTE the slash command is already set on slack
       (timbre/error "Flight direction is missing! Asking for more info...")
       (thread (post-to-slack (request-flight-direction airport user-id)
-                             hook-url))
+                             response-url))
       {:status 200
        :body ""})))
 
@@ -255,12 +254,13 @@
               user-id (:id (:user request))
               received-action (first (:actions request))
               airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
-              flight-direction (keyword (:value received-action))]
+              flight-direction (keyword (:value received-action))
+              response-url (:response_url request)]
           (do
             (timbre/info (str "Slack user " user-id
                               " is retrying. Checking for flights at "
                               airport "..."))
-            (thread (post-flight airport flight-direction))
+            (thread (post-flight airport flight-direction response-url))
             {:status 200
              :body ""})))
 
