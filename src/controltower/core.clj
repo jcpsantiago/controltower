@@ -144,13 +144,18 @@
   (if (empty? flight)
     {:text (str "Tower observes " (get-weather "Berlin") ;;FIXME generalize
                 ", no air traffic, over.")}
-    {:text (create-flight-str flight)
-     :attachments
-       [{:text ""
-         :color "good"
-         :image_url (create-mapbox-str (:lon flight)
-                                       (:lat flight)
-                                       mapbox-api-key)}]}))
+    {:blocks [{:type "section"
+               :text {:type "plain_text"
+                      :text (create-flight-str flight)}}
+              {:type "image"
+               :title {:type "plain_text"
+                       :text (:flight flight)
+                       :emoji true}
+               :image_url (create-mapbox-str (:lon flight)
+                                             (:lat flight)
+                                             mapbox-api-key)
+               :alt_text "flight overview"}]}))
+
 
 (defn get-flight
   "Calls flightradar24m cleans the data and extracts the first flight"
