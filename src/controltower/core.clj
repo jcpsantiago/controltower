@@ -136,7 +136,7 @@
        "url-" airplane-img-url
        "(" longitude "," latitude ")/"
        longitude "," latitude
-       ",14,80,0/200x200?attribution=false&logo=false&access_token="
+       ",14,0,0/200x200?attribution=false&logo=false&access_token="
        api-key))
 
 (defn create-payload
