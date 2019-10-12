@@ -225,7 +225,7 @@
            :body ""})
         (do
           (println flight-direction)
-          (thread (post-flight airport flight-direction))
+          (thread (post-flight airport flight-direction response-url))
           (timbre/info "Replying immediately to slack")
           {:status 200
            :body (str "User " user-id " standby...")})))
