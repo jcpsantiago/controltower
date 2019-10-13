@@ -9,7 +9,8 @@
             [taoensso.timbre :as timbre]
             [clojure.string :as str]
             [clojure2d.core :as c2d]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [clojure.java.shell :as shell])
   (:import [java.awt Graphics2D]
            [java.awt.image BufferedImage]
            [javax.imageio ImageIO])
@@ -61,10 +62,12 @@
 
 (defn rotate-and-save!
   [image angle]
-  (-> image
-    (rotate-around-center angle)
-    ;;FIXME should use a global variable instead of hard coded path
-    (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png"))))
+  (do
+    (println (shell/sh "ls"))
+    (-> image
+      (rotate-around-center angle)
+      ;;FIXME should use a global variable instead of hard coded path
+      (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png")))))
 
 (defn iata->city
   "Matches a IATA code to the city name"
