@@ -7,14 +7,19 @@
             [clojure.core.async :refer [thread]]
             [cheshire.core :as json]
             [taoensso.timbre :as timbre]
-            [clojure.string :as str])
+            [clojure.string :as str]
+            [clojure2d.core :as c2d]
+            [clojure.java.io :as io])
+  (:import [java.awt Graphics2D]
+           [java.awt.image BufferedImage]
+           [javax.imageio ImageIO])
   (:gen-class))
 
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
-(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane_small.png")
+(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane_small_temp.png")
 
 (defn parse-json
   [file]
@@ -37,6 +42,30 @@
       airport
       flight-direction))
 
+(def orig-airplane-image (-> "resources/public/airplane_small.png")
+                         (io/file)
+                         (ImageIO/read))
+
+;; thanks to user Yuhan Quek in Clojurians
+;; https://clojurians.slack.com/archives/C03S1KBA2/p1570958786346700
+(defn rotate-around-center
+  [img degrees]
+  (let [w   (.getWidth img)
+        h   (.getHeight img)]
+    (c2d/with-canvas-> (c2d/canvas w h)
+      (c2d/translate (/ w 2) (/ h 2))
+      (c2d/rotate (* degrees (/ Math/PI 180)))
+      (c2d/translate (- (/ w 2)) (- (/ h 2)))
+      (c2d/image img)
+      (c2d/get-image))))
+
+(defn rotate-and-save!
+  [image angle]
+  (-> image
+    (rotate-around-center angle)
+    ;;FIXME should use a global variable instead of hard coded path
+    (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png"))))
+
 (defn iata->city
   "Matches a IATA code to the city name"
   [iata]
@@ -48,7 +77,7 @@
     (timbre/error "Failed, exception is" body)
     (timbre/info (str service " async HTTP " type " success: ") status)))
 
-(defn post-to-slack
+(defn post-to-slack!
   "Post message to Slack"
   [payload url]
   (-> @(http/post
@@ -57,20 +86,20 @@
          :content-type :json})
       (log-http-status "Slack" "POST")))
 
-(defn get-api-data
+(defn get-api-data!
   "GET an API and pull only the body"
   [url]
   (json/parse-string
    (:body @(http/get url))
    true))
 
-(defn get-weather
+(defn get-weather!
   "Get current weather condition for a city"
   [city]
   (timbre/info "Checking the weather...")
   (:description
    (first (:weather
-            (get-api-data
+            (get-api-data!
               (str "http://api.openweathermap.org/data/2.5/weather?q=" city
                    "&appid=" openweather-api-key))))))
 
@@ -111,7 +140,8 @@
      :lat (nth clean-flight-data 1)
      :lon (nth clean-flight-data 2)
      :altitude (int (/ (nth clean-flight-data 4) 3.281))
-     :speed (int (* (nth clean-flight-data 5) 1.852))}))
+     :speed (int (* (nth clean-flight-data 5) 1.852))
+     :track (nth clean-flight-data 3)}))
 
 (defn create-flight-str
   "Creates a string with information about the flight"
@@ -123,7 +153,7 @@
          " currently moving at " (:speed flight) " km/h over "
          (re-find #"[^,]*"
                   (get-address
-                    (get-api-data
+                    (get-api-data!
                       (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                            (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
        " at an altitude of " (:altitude flight) " meters."))
@@ -142,38 +172,42 @@
   "Create a map to be converted into JSON for POST"
   [flight]
   (if (empty? flight)
-    {:text (str "Tower observes " (get-weather "Berlin") ;;FIXME generalize
+    {:text (str "Tower observes " (get-weather! "Berlin") ;;FIXME generalize
                 ", no air traffic, over.")}
-    {:blocks [{:type "section"
-               :text {:type "plain_text"
-                      :text (create-flight-str flight)}}
-              {:type "image"
-               :title {:type "plain_text"
-                       :text (:flight flight)
-                       :emoji true}
-               :image_url (create-mapbox-str (:lon flight)
-                                             (:lat flight)
-                                             mapbox-api-key)
-               :alt_text "flight overview"}]}))
+    (do
+      (timbre/info "Rotating image and saving to disk.")
+      (rotate-and-save! orig-airplane-image (:track flight))
+      {:blocks [{:type "section"
+                 :text {:type "plain_text"
+                        :text (create-flight-str flight)}}
+                {:type "image"
+                 :title {:type "plain_text"
+                         :text (or (:flight flight) "Flight location")
+                         :emoji true}
+                 :image_url (create-mapbox-str (:lon flight)
+                                               (:lat flight)
+                                               mapbox-api-key)
+                 :alt_text "flight overview"}]})))
 
 
-(defn get-flight
+(defn get-flight!
   "Calls flightradar24m cleans the data and extracts the first flight"
   [airport flight-direction]
   (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
            (get-bounding-box airport flight-direction))
-      get-api-data
+      get-api-data!
       remove-crud
       first-flight
       extract-flight))
 
 
-(defn post-flight
+(defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
-  (-> (get-flight airport flight-direction)
+  (-> (get-flight! airport flight-direction)
       create-payload
-      (post-to-slack response-url)))
+      ;(println)))
+      (post-to-slack! response-url)))
 
 (defn request-flight-direction
   [airport user-id]
@@ -219,19 +253,19 @@
       (if (nil? flight-direction)
         (do
           (timbre/error "Invalid flight direction!")
-          (thread (post-to-slack (request-flight-direction airport user-id)
+          (thread (post-to-slack! (request-flight-direction airport user-id)
                                  response-url))
           {:status 200
            :body ""})
         (do
-          (thread (post-flight airport flight-direction response-url))
+          (thread (post-flight! airport flight-direction response-url))
           (timbre/info "Replying immediately to slack")
           {:status 200
            :body (str "User " user-id " standby...")})))
     (do
       ;;NOTE the slash command is already set on slack
       (timbre/error "Flight direction is missing! Asking for more info...")
-      (thread (post-to-slack (request-flight-direction airport user-id)
+      (thread (post-to-slack! (request-flight-direction airport user-id)
                              response-url))
       {:status 200
        :body ""})))
@@ -265,7 +299,7 @@
             (timbre/info (str "Slack user " user-id
                               " is retrying. Checking for flights at "
                               airport "..."))
-            (thread (post-flight airport flight-direction response-url))
+            (thread (post-flight! airport flight-direction response-url))
             {:status 200
              :body ""})))
 
