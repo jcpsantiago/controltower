@@ -11,3 +11,4 @@ pom.xml.asc
 .hgignore
 .hg/
 .DS_Store
+resources/public/airplane_small_temp.png
