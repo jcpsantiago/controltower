@@ -9,9 +9,7 @@
             [taoensso.timbre :as timbre]
             [clojure.string :as str]
             [clojure2d.core :as c2d]
-            [clojure.java.io :as io]
-            [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds])
+            [clojure.java.io :as io])
   (:import [java.awt Graphics2D]
            [java.awt.image BufferedImage]
            [javax.imageio ImageIO])
@@ -78,18 +76,10 @@
 
 (defn image->bytes!
   [image angle]
-  (do
-    (-> image
-        (rotate-around-center angle)
-        (ImageIO/write "png" output-bytes)))
-  (.toByteArray output-bytes))
-
-(defn send-image-s3!
-  [file-path image angle]
-  (aws/invoke s3 {:op :PutObject :request {:Bucket s3-bucket :Key file-path
-                                           :Body (io/input-stream (image->bytes! image angle))
-                                           :ACL "public-read"}}))
-
+  (-> image
+    (rotate-around-center angle)
+    ;;FIXME should use a global variable instead of hard coded path
+    (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png"))))
 
 (defn iata->city
   "Matches a IATA code to the city name"
