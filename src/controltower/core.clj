@@ -19,7 +19,7 @@
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
-(def airplane-img-url "https%3A%2F%2Fclassique-baguette-21292.herokuapp.com%2Fairplane_small_temp.png")
+(def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 
 (defn parse-json
   [file]
@@ -177,6 +177,7 @@
     (do
       (timbre/info "Rotating image and saving to disk.")
       (rotate-and-save! orig-airplane-image (:track flight))
+      (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
                         :text (create-flight-str flight)}}
