@@ -12,6 +12,7 @@
                  [org.clojure/core.async "0.4.500"]
                  [cheshire "5.8.1"]
                  [com.taoensso/timbre "4.10.0"]
+                 [mock-clj "0.2.1"]
                  [clojure2d "1.2.0-20190828.150437-33" :exclusions [org.clojure/clojure]]]
   :plugins [[lein-cloverage "1.1.1"]]
   :main ^:skip-aot controltower.core
