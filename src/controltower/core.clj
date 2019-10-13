@@ -42,9 +42,9 @@
       airport
       flight-direction))
 
-(def orig-airplane-image (-> "resources/public/airplane_small.png")
-                         (io/file)
-                         (ImageIO/read))
+(def orig-airplane-image (-> "resources/public/airplane_small.png"
+                             (io/file)
+                             (ImageIO/read)))
 
 ;; thanks to user Yuhan Quek in Clojurians
 ;; https://clojurians.slack.com/archives/C03S1KBA2/p1570958786346700
