@@ -10,7 +10,8 @@
             [clojure.string :as str]
             [clojure2d.core :as c2d]
             [clojure.java.io :as io]
-            [clojure.java.shell :as shell])
+            [cognitect.aws.client.api :as aws]
+            [cognitect.aws.credentials :as creds])
   (:import [java.awt Graphics2D]
            [java.awt.image BufferedImage]
            [javax.imageio ImageIO])
@@ -21,6 +22,9 @@
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
+(def s3-bucket (System/getenv "CONTROL_TOWER_S3_BUCKET"))
+
+(defn uuid [] (.toString (java.util.UUID/randomUUID)))
 
 (defn parse-json
   [file]
@@ -60,14 +64,32 @@
       (c2d/image img)
       (c2d/get-image))))
 
-(defn rotate-and-save!
+(def s3 (aws/client {:api :s3
+                     :region :eu-central-1
+                     :credentials-provider (creds/environment-credentials-provider)}))
+
+(aws/validate-requests s3 true)
+
+(defn add-uuid
+  [string uuid extension]
+  (str string uuid extension))
+
+(def output-bytes (java.io.ByteArrayOutputStream.))
+
+(defn image->bytes!
   [image angle]
   (do
-    (println (shell/sh "ls"))
     (-> image
-      (rotate-around-center angle)
-      ;;FIXME should use a global variable instead of hard coded path
-      (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png")))))
+        (rotate-around-center angle)
+        (ImageIO/write "png" output-bytes)))
+  (.toByteArray output-bytes))
+
+(defn send-image-s3!
+  [file-path image angle]
+  (aws/invoke s3 {:op :PutObject :request {:Bucket s3-bucket :Key file-path
+                                           :Body (io/input-stream (image->bytes! image angle))
+                                           :ACL "public-read"}}))
+
 
 (defn iata->city
   "Matches a IATA code to the city name"
@@ -163,9 +185,9 @@
 
 (defn create-mapbox-str
   "Creates mapbox string for image with map and airplane"
-  [longitude latitude api-key]
+  [image-url longitude latitude api-key]
   (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
-       "url-" airplane-img-url
+       "url-" image-url
        "(" longitude "," latitude ")/"
        longitude "," latitude
        ",14,0,0/200x200?attribution=false&logo=false&access_token="
@@ -177,9 +199,13 @@
   (if (empty? flight)
     {:text (str "Tower observes " (get-weather! "Berlin") ;;FIXME generalize
                 ", no air traffic, over.")}
-    (do
-      (timbre/info "Rotating image and saving to disk.")
-      (rotate-and-save! orig-airplane-image (:track flight))
+    (let [plane-uuid (uuid)
+          plane-url (add-uuid airplane-img-url plane-uuid ".png")
+          plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
+     (do
+      (timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
+      ;;FIXME should this S3 upload really be here?
+      (send-s3! temp-file-path orig-airplane-image (:track flight))
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
@@ -188,10 +214,11 @@
                  :title {:type "plain_text"
                          :text (or (:flight flight) "Flight location")
                          :emoji true}
-                 :image_url (create-mapbox-str (:lon flight)
+                 :image_url (create-mapbox-str plane-url
+                                               (:lon flight)
                                                (:lat flight)
                                                mapbox-api-key)
-                 :alt_text "flight overview"}]})))
+                 :alt_text "flight overview"}]}))))
 
 
 (defn get-flight!

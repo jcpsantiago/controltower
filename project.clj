@@ -13,7 +13,10 @@
                  [cheshire "5.8.1"]
                  [com.taoensso/timbre "4.10.0"]
                  [mock-clj "0.2.1"]
-                 [clojure2d "1.2.0-20190828.150437-33" :exclusions [org.clojure/clojure]]]
+                 [clojure2d "1.2.0-20190828.150437-33" :exclusions [org.clojure/clojure]]
+                 [com.cognitect.aws/api "0.8.352"]
+                 [com.cognitect.aws/endpoints "1.1.11.651"]
+                 [com.cognitect.aws/s3 "747.2.533.0"]]
   :plugins [[lein-cloverage "1.1.1"]]
   :main ^:skip-aot controltower.core
   :min-lein-version "2.0.0"
