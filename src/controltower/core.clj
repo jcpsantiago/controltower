@@ -9,7 +9,9 @@
             [taoensso.timbre :as timbre]
             [clojure.string :as str]
             [clojure2d.core :as c2d]
-            [clojure.java.io :as io])
+            [clojure.java.io :as io]
+            [cognitect.aws.client.api :as aws]
+            [cognitect.aws.credentials :as creds])
   (:import [java.awt Graphics2D]
            [java.awt.image BufferedImage]
            [javax.imageio ImageIO])
@@ -76,10 +78,17 @@
 
 (defn image->bytes!
   [image angle]
-  (-> image
-    (rotate-around-center angle)
-    ;;FIXME should use a global variable instead of hard coded path
-    (ImageIO/write "png" (io/as-file "resources/public/airplane_small_temp.png"))))
+  (do
+    (-> image
+        (rotate-around-center angle)
+        (ImageIO/write "png" output-bytes)))
+  (.toByteArray output-bytes))
+
+(defn send-image-s3!
+  [file-path image angle]
+  (aws/invoke s3 {:op :PutObject :request {:Bucket s3-bucket :Key file-path
+                                           :Body (io/input-stream (image->bytes! image angle))
+                                           :ACL "public-read"}}))
 
 (defn iata->city
   "Matches a IATA code to the city name"
@@ -193,9 +202,9 @@
           plane-url (add-uuid airplane-img-url plane-uuid ".png")
           plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
      (do
-      (timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
+      ;(timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
       ;;FIXME should this S3 upload really be here?
-      (send-image-s3! plane-path orig-airplane-image (:track flight))
+      ;(send-image-s3! plane-path orig-airplane-image (:track flight))
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
@@ -204,7 +213,7 @@
                  :title {:type "plain_text"
                          :text (or (:flight flight) "Flight location")
                          :emoji true}
-                 :image_url (create-mapbox-str plane-url
+                 :image_url (create-mapbox-str "https://classique-baguette-21292.herokuapp.com/airplane_small.png"
                                                (:lon flight)
                                                (:lat flight)
                                                mapbox-api-key)
