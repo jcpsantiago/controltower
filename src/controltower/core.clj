@@ -205,7 +205,7 @@
      (do
       (timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
       ;;FIXME should this S3 upload really be here?
-      (send-s3! temp-file-path orig-airplane-image (:track flight))
+      (send-image-s3! plane-path orig-airplane-image (:track flight))
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
