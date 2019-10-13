@@ -18,8 +18,8 @@
 
 (deftest parse-json-files
   (testing "read json files correctly"
-    (is (= (parse-json "test/controltower/json-file-testing.json")
-           ({:completed false, :title "delectus aut autem", :id 1, :userId 1})))))
+    (is (= (first (parse-json "test/controltower/json-file-testing.json"))
+           {:userId 1 :id 1 :title "delectus aut autem" :completed false}))))
 
 ;; saved call just for testing
 (def flight
