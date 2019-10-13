@@ -68,7 +68,7 @@
                      :region :eu-central-1
                      :credentials-provider (creds/environment-credentials-provider)}))
 
-(aws/validate-requests s3 true)
+;(aws/validate-requests s3 true)
 
 (defn add-uuid
   [string uuid extension]
