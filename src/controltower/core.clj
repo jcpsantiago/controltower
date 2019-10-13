@@ -201,13 +201,18 @@
       first-flight
       extract-flight))
 
+(defn print-and-pass
+  [payload]
+  (do
+    (println payload)
+    payload))
 
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
   (-> (get-flight! airport flight-direction)
       create-payload
-      ;(println)))
+      print-and-pass
       (post-to-slack! response-url)))
 
 (defn request-flight-direction
