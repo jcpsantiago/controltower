@@ -24,6 +24,12 @@
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def s3-bucket (System/getenv "CONTROL_TOWER_S3_BUCKET"))
 
+(defn log-http-status
+  [{:keys [status body error]} service type]
+  (if (not (= status 200))
+    (timbre/error "Failed, exception is" body)
+    (timbre/info (str service " async HTTP " type " success: ") status)))
+
 (defn uuid [] (.toString (java.util.UUID/randomUUID)))
 
 (defn parse-json
@@ -65,10 +71,8 @@
       (c2d/get-image))))
 
 (def s3 (aws/client {:api :s3
-                     :region :eu-central-1
+                     :region :us-east-1
                      :credentials-provider (creds/environment-credentials-provider)}))
-
-;(aws/validate-requests s3 true)
 
 (defn add-uuid
   [string uuid extension]
@@ -84,11 +88,18 @@
         (ImageIO/write "png" output-bytes)))
   (.toByteArray output-bytes))
 
+;; the only thing missing for proper public access was ContentType, otherwise
+;; the file is saved as a stream or whatever
 (defn send-image-s3!
   [file-path image angle]
-  (aws/invoke s3 {:op :PutObject :request {:Bucket s3-bucket :Key file-path
-                                           :Body (io/input-stream (image->bytes! image angle))
-                                           :ACL "public-read"}}))
+  (timbre/info "Uploading to S3...")
+  (aws/invoke s3 {:op :PutObject
+                  :request {:Bucket s3-bucket :Key file-path
+                            :Body (io/input-stream
+                                   (image->bytes! image angle))
+                            :ACL "public-read"
+                            :ContentType "image/png"}}))
+
 
 (defn iata->city
   "Matches a IATA code to the city name"
@@ -202,9 +213,9 @@
           plane-url (add-uuid airplane-img-url plane-uuid ".png")
           plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
      (do
-      ;(timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
+      (timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
       ;;FIXME should this S3 upload really be here?
-      ;(send-image-s3! plane-path orig-airplane-image (:track flight))
+      (send-image-s3! plane-path orig-airplane-image (:track flight))
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
@@ -213,7 +224,7 @@
                  :title {:type "plain_text"
                          :text (or (:flight flight) "Flight location")
                          :emoji true}
-                 :image_url (create-mapbox-str "https://classique-baguette-21292.herokuapp.com/airplane_small.png"
+                 :image_url (create-mapbox-str plane-url
                                                (:lon flight)
                                                (:lat flight)
                                                mapbox-api-key)
@@ -221,7 +232,7 @@
 
 
 (defn get-flight!
-  "Calls flightradar24m cleans the data and extracts the first flight"
+  "Calls flightradar24 cleans the data and extracts the first flight"
   [airport flight-direction]
   (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
            (get-bounding-box airport flight-direction))
@@ -230,18 +241,11 @@
       first-flight
       extract-flight))
 
-(defn print-and-pass
-  [payload]
-  (do
-    (println payload)
-    payload))
-
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
   (-> (get-flight! airport flight-direction)
       create-payload
-      print-and-pass
       (post-to-slack! response-url)))
 
 (defn request-flight-direction
