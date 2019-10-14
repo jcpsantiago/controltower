@@ -238,7 +238,7 @@
            (get-bounding-box airport flight-direction))
       get-api-data!
       remove-crud
-      filter-landed
+      ;filter-landed
       first-flight
       extract-flight))
 
