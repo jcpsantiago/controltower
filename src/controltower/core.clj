@@ -1,19 +1,21 @@
 (ns controltower.core
-  (:require [org.httpkit.server :as server]
-            [org.httpkit.client :as http]
-            [compojure.core]
-            [compojure.route :as route]
-            [ring.middleware.defaults]
-            [clojure.core.async :refer [thread]]
-            [cheshire.core :as json]
-            [taoensso.timbre :as timbre]
-            [clojure2d.core :as c2d]
-            [clojure.java.io :as io]
-            [cognitect.aws.client.api :as aws]
-            [cognitect.aws.credentials :as creds])
-  (:import [java.awt Graphics2D]
-           [java.awt.image BufferedImage]
-           [javax.imageio ImageIO])
+  (:require
+   [org.httpkit.server :as server]
+   [org.httpkit.client :as http]
+   [compojure.core :refer [defroutes GET POST]]
+   [compojure.route :as route]
+   [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
+   [clojure.core.async :refer [thread]]
+   [cheshire.core :as json]
+   [taoensso.timbre :as timbre]
+   [clojure2d.core :as c2d]
+   [clojure.java.io :as io]
+   [cognitect.aws.client.api :as aws]
+   [cognitect.aws.credentials :as creds])
+  (:import
+   [java.awt Graphics2D]
+   [java.awt.image BufferedImage]
+   [javax.imageio ImageIO])
   (:gen-class))
 
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
@@ -313,8 +315,6 @@
                             " is requesting info. Checking for flights at "
                             airport "..."))
           (which-flight user-id airport command-text response-url)))
-
-
   (POST "/which-flight-retry" req
         (let [request (-> req
                           :params
@@ -331,8 +331,6 @@
           (thread (post-flight! airport flight-direction response-url))
           {:status 200
            :body ""}))
-
-
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 
