@@ -147,7 +147,7 @@
 
 (defn filter-landed
   [item]
-  (filter #(> (nth (second %) 4) 0) item))
+  (into {} (filter #(> (nth (second %) 4) 0) item)))
 
 (defn get-first-plane
   "Get the keyword for the first plane"
