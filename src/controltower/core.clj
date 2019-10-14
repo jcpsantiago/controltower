@@ -145,6 +145,10 @@
   [flight-data]
   (dissoc flight-data :full_count :version))
 
+(defn filter-landed
+  [item]
+  (filter #(> (nth (second %) 4) 0) item))
+
 (defn get-first-plane
   "Get the keyword for the first plane"
   [clean-flight-data]
@@ -234,6 +238,7 @@
            (get-bounding-box airport flight-direction))
       get-api-data!
       remove-crud
+      filter-landed
       first-flight
       extract-flight))
 
