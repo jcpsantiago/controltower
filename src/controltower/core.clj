@@ -45,10 +45,10 @@
 
 ;; from https://boundingbox.klokantech.com
 (def bounding-boxes
-  {:txl {:e "52.57,13.36"
-         :w "52.55,13.2"}
-   :sxf {:e "52.41,13.62"
-         :w "52.34,13.35"}})
+  {:txl {:e "52.577701,52.558327,13.32212,13.402922"
+         :w "52.561077,52.543694,13.182475,13.249971"}
+   :sxf {:e "52.430207,52.357171,13.534024,13.704046"
+         :w "52.300794,52.373924,13.2937,13.463721"}})
 
 (defn get-bounding-box
   [airport flight-direction]
@@ -238,7 +238,7 @@
            (get-bounding-box airport flight-direction))
       get-api-data!
       remove-crud
-      ;filter-landed
+      filter-landed
       first-flight
       extract-flight))
 
