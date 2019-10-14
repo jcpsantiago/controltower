@@ -77,14 +77,13 @@
   [string uuid extension]
   (str string uuid extension))
 
-(def output-bytes (java.io.ByteArrayOutputStream.))
-
 (defn image->bytes!
   [image angle]
-  (-> image
-      (rotate-around-center angle)
-      (ImageIO/write "png" output-bytes))
-  (.toByteArray output-bytes))
+  (let [output-bytes (java.io.ByteArrayOutputStream.)]
+    (-> image
+        (rotate-around-center angle)
+        (ImageIO/write "png" output-bytes))
+    (.toByteArray output-bytes)))
 
 ;; the only thing missing for proper public access was ContentType, otherwise
 ;; the file is saved as a stream or whatever
