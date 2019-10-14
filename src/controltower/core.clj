@@ -91,12 +91,11 @@
 ;; the only thing missing for proper public access was ContentType, otherwise
 ;; the file is saved as a stream or whatever
 (defn send-image-s3!
-  [file-path image angle]
-  (timbre/info "Uploading to S3...")
+  [image file-path]
+  (timbre/info "Uploading to" s3-bucket "S3 bucket...")
   (aws/invoke s3 {:op :PutObject
                   :request {:Bucket s3-bucket :Key file-path
-                            :Body (io/input-stream
-                                   (image->bytes! image angle))
+                            :Body image
                             :ACL "public-read"
                             :ContentType "image/png"}}))
 
@@ -213,9 +212,11 @@
           plane-url (add-uuid airplane-img-url plane-uuid ".png")
           plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
      (do
-      (timbre/info "Rotating image and uploading to S3 with uuid " plane-uuid)
+      (timbre/info "Rotating image and uploading to S3 with uuid" plane-uuid)
       ;;FIXME should this S3 upload really be here?
-      (send-image-s3! plane-path orig-airplane-image (:track flight))
+      (-> (image->bytes! orig-airplane-image (:track flight))
+          (io/input-stream)
+          (send-image-s3! plane-path))
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
