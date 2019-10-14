@@ -147,18 +147,22 @@
 
 (defn filter-landed
   [item]
+  (timbre/info "Keeping only flights with altitude above 0")
   (into {} (filter #(> (nth (second %) 4) 0) item)))
 
 (defn get-first-plane
   "Get the keyword for the first plane"
   [clean-flight-data]
+  (timbre/info "Keeping only first flight in list")
   (first (keys clean-flight-data)))
 
 (defn first-flight
   "Get data for the first plane in the list"
   [clean-flight-data]
   (if (empty? clean-flight-data)
-    {}
+    (do
+      (timbre/info "No flights found, returning empty map instead")
+      {})
     ((get-first-plane clean-flight-data) clean-flight-data)))
 
 (defn extract-flight
@@ -166,29 +170,31 @@
   [clean-flight-data]
   (if (empty? clean-flight-data)
     {}
-    {:flight (nth clean-flight-data 13)
-     :start (nth clean-flight-data 11)
-     :end (nth clean-flight-data 12)
-     :aircraft (nth clean-flight-data 8)
-     :lat (nth clean-flight-data 1)
-     :lon (nth clean-flight-data 2)
-     :altitude (int (/ (nth clean-flight-data 4) 3.281))
-     :speed (int (* (nth clean-flight-data 5) 1.852))
-     :track (nth clean-flight-data 3)}))
+    (do
+      (timbre/info "Extracting flight information into map")
+      {:flight (nth clean-flight-data 13)
+       :start (nth clean-flight-data 11)
+       :end (nth clean-flight-data 12)
+       :aircraft (nth clean-flight-data 8)
+       :lat (nth clean-flight-data 1)
+       :lon (nth clean-flight-data 2)
+       :altitude (int (/ (nth clean-flight-data 4) 3.281))
+       :speed (int (* (nth clean-flight-data 5) 1.852))
+       :track (nth clean-flight-data 3)})))
 
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight]
   (str "Flight " (:flight flight)
-         " (" (:aircraft flight) ") "
-         "from " (iata->city (:start flight)) " (" (:start flight) ")"
-         " to " (iata->city (:end flight)) " (" (:end flight) ")"
-         " currently moving at " (:speed flight) " km/h over "
-         (re-find #"[^,]*"
-                  (get-address
-                    (get-api-data!
-                      (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-                           (:lat flight) "," (:lon flight) "&key=" maps-api-key))))
+       " (" (:aircraft flight) ") "
+       "from " (iata->city (:start flight)) " (" (:start flight) ")"
+       " to " (iata->city (:end flight)) " (" (:end flight) ")"
+       " currently moving at " (:speed flight) " km/h over "
+       (->> (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
+              (:lat flight) "," (:lon flight) "&key=" maps-api-key)
+            get-api-data!
+            get-address
+            (re-find #"[^,]*"))
        " at an altitude of " (:altitude flight) " meters."))
 
 (defn create-mapbox-str
