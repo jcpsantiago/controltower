@@ -276,7 +276,7 @@
 ;; routes and handlers
 (defn simple-body-page
   "Simple page for healthchecks"
-  []
+  [req]
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "Hello World"})
@@ -311,7 +311,7 @@
        :body ""})))
 
 (defroutes app-routes
-  (GET "/" [] simple-body-page)
+  (GET "/" [req] simple-body-page)
   (POST "/which-flight" req
         (let [request (:params req)
               user-id (:user_id request)
