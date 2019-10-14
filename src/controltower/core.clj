@@ -1,13 +1,12 @@
 (ns controltower.core
   (:require [org.httpkit.server :as server]
             [org.httpkit.client :as http]
-            [compojure.core :refer :all]
+            [compojure.core]
             [compojure.route :as route]
-            [ring.middleware.defaults :refer :all]
+            [ring.middleware.defaults]
             [clojure.core.async :refer [thread]]
             [cheshire.core :as json]
             [taoensso.timbre :as timbre]
-            [clojure.string :as str]
             [clojure2d.core :as c2d]
             [clojure.java.io :as io]
             [cognitect.aws.client.api :as aws]
@@ -25,7 +24,7 @@
 (def s3-bucket (System/getenv "CONTROL_TOWER_S3_BUCKET"))
 
 (defn log-http-status
-  [{:keys [status body error]} service type]
+  [{:keys [status body]} service type]
   (if (not (= status 200))
     (timbre/error "Failed, exception is" body)
     (timbre/info (str service " async HTTP " type " success: ") status)))
@@ -82,10 +81,9 @@
 
 (defn image->bytes!
   [image angle]
-  (do
-    (-> image
-        (rotate-around-center angle)
-        (ImageIO/write "png" output-bytes)))
+  (-> image
+      (rotate-around-center angle)
+      (ImageIO/write "png" output-bytes))
   (.toByteArray output-bytes))
 
 ;; the only thing missing for proper public access was ContentType, otherwise
@@ -104,12 +102,6 @@
   "Matches a IATA code to the city name"
   [iata]
   (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
-
-(defn log-http-status
-  [{:keys [status body error]} service type]
-  (if (not (= status 200))
-    (timbre/error "Failed, exception is" body)
-    (timbre/info (str service " async HTTP " type " success: ") status)))
 
 (defn post-to-slack!
   "Post message to Slack"
@@ -211,7 +203,6 @@
     (let [plane-uuid (uuid)
           plane-url (add-uuid airplane-img-url plane-uuid ".png")
           plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
-     (do
       (timbre/info "Rotating image and uploading to S3 with uuid" plane-uuid)
       ;;FIXME should this S3 upload really be here?
       (-> (image->bytes! orig-airplane-image (:track flight))
@@ -229,7 +220,8 @@
                                                (:lon flight)
                                                (:lat flight)
                                                mapbox-api-key)
-                 :alt_text "flight overview"}]}))))
+                 :alt_text "flight overview"}]})))
+
 
 
 (defn get-flight!
@@ -276,7 +268,7 @@
 ;; routes and handlers
 (defn simple-body-page
   "Simple page for healthchecks"
-  [req]
+  []
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body    "Hello World"})
@@ -285,7 +277,7 @@
   "Return the current flight"
   [user-id airport command-text response-url]
   (if (and (contains? bounding-boxes airport)
-           (not (empty? command-text)))
+           (seq command-text))
     (let [flight-direction (keyword
                             (first
                              (re-matches #"(?i)(^e{1}$)|(^w{1}$)"
@@ -310,7 +302,6 @@
       {:status 200
        :body ""})))
 
-
 (defroutes app-routes
   (GET "/" [] simple-body-page)
   (POST "/which-flight" req
@@ -319,11 +310,11 @@
               airport (keyword (re-find #"[a-z]+" (:command request)))
               command-text (:text request)
               response-url (:response_url request)]
-          (do
-            (timbre/info (str "Slack user " user-id
-                              " is requesting info. Checking for flights at "
-                              airport "..."))
-            (which-flight user-id airport command-text response-url))))
+          (timbre/info (str "Slack user " user-id
+                            " is requesting info. Checking for flights at "
+                            airport "..."))
+          (which-flight user-id airport command-text response-url)))
+
 
   (POST "/which-flight-retry" req
         (let [request (-> req
@@ -335,19 +326,19 @@
               airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
               flight-direction (keyword (:value received-action))
               response-url (:response_url request)]
-          (do
-            (timbre/info (str "Slack user " user-id
-                              " is retrying. Checking for flights at "
-                              airport "..."))
-            (thread (post-flight! airport flight-direction response-url))
-            {:status 200
-             :body ""})))
+          (timbre/info (str "Slack user " user-id
+                            " is retrying. Checking for flights at "
+                            airport "..."))
+          (thread (post-flight! airport flight-direction response-url))
+          {:status 200
+           :body ""}))
+
 
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 
 (defn -main
   "This is our main entry point"
-  [& args]
+  []
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
   (timbre/info (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
