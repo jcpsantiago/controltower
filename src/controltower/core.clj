@@ -44,7 +44,7 @@
 
 ;; from https://boundingbox.klokantech.com
 (def bounding-boxes
-  {:txl {:e "52.575821,52.556915,13.317147,13.405261"
+  {:txl {:e "52.577701,52.558327,13.32212,13.402922"
          :w "52.561077,52.543694,13.182475,13.249971"}})
 
 (defn get-bounding-box
