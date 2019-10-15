@@ -1,17 +1,17 @@
 (ns controltower.core
   (:require
-   [org.httpkit.server :as server]
-   [org.httpkit.client :as http]
+   [cheshire.core :as json]
+   [clojure.core.async :refer [thread]]
+   [clojure.java.io :as io]
+   [clojure2d.core :as c2d]
+   [cognitect.aws.client.api :as aws]
+   [cognitect.aws.credentials :as creds]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
+   [org.httpkit.server :as server]
+   [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-   [clojure.core.async :refer [thread]]
-   [cheshire.core :as json]
-   [taoensso.timbre :as timbre]
-   [clojure2d.core :as c2d]
-   [clojure.java.io :as io]
-   [cognitect.aws.client.api :as aws]
-   [cognitect.aws.credentials :as creds])
+   [taoensso.timbre :as timbre])
   (:import
    [java.awt Graphics2D]
    [java.awt.image BufferedImage]
@@ -43,6 +43,10 @@
 ;; encoding is problematic, so I rolled my own json from the csv file
 (def all-airports (parse-json "resources/airport-codes_json.json"))
 
+(def orig-airplane-image (-> "resources/public/airplane_small.png"
+                             (io/file)
+                             (ImageIO/read)))
+
 ;; from https://boundingbox.klokantech.com
 (def bounding-boxes
   {:txl {:e "52.577701,52.558327,13.32212,13.402922"
@@ -56,9 +60,7 @@
       airport
       flight-direction))
 
-(def orig-airplane-image (-> "resources/public/airplane_small.png"
-                             (io/file)
-                             (ImageIO/read)))
+
 
 ;; thanks to user Yuhan Quek in Clojurians
 ;; https://clojurians.slack.com/archives/C03S1KBA2/p1570958786346700
