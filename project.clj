@@ -4,10 +4,6 @@
   :license {:name "EPL-2.0"
             :url "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[cheshire "5.8.1"]
-                 [clojure2d "1.2.0-20190828.150437-33" :exclusions [org.clojure/clojure]]
-                 [com.cognitect.aws/api "0.8.352"]
-                 [com.cognitect.aws/endpoints "1.1.11.651"]
-                 [com.cognitect.aws/s3 "747.2.533.0"]
                  [com.taoensso/timbre "4.10.0"]
                  [compojure "1.6.1"]
                  [org.clojure/clojure "1.10.0"]
