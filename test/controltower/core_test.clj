@@ -1,6 +1,7 @@
 (ns controltower.core-test
   (:require [clojure.test :refer :all]
             [controltower.core :refer :all]
+            [controltower.utils :as utils]
             [mock-clj.core :as mc]))
 
 (deftest api-data
@@ -18,7 +19,7 @@
 
 (deftest parse-json-files
   (testing "read json files correctly"
-    (is (= (first (parse-json "test/controltower/json-file-testing.json"))
+    (is (= (first (utils/parse-json "test/controltower/json-file-testing.json"))
            {:userId 1 :id 1 :title "delectus aut autem" :completed false}))))
 
 ;; saved call just for testing
