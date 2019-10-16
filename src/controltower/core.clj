@@ -3,11 +3,9 @@
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
    [clojure.java.io :as io]
-   [clojure2d.core :as c2d]
-   [cognitect.aws.client.api :as aws]
-   [cognitect.aws.credentials :as creds]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
+   [controltower.utils :as utils]
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
@@ -24,24 +22,12 @@
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def s3-bucket (System/getenv "CONTROL_TOWER_S3_BUCKET"))
-
-(defn log-http-status
-  [{:keys [status body]} service type]
-  (if (not (= status 200))
-    (timbre/error "Failed, exception is" body)
-    (timbre/info (str service " async HTTP " type " success: ") status)))
-
-(defn uuid [] (.toString (java.util.UUID/randomUUID)))
-
-(defn parse-json
-  [file]
-  (json/parsed-seq (clojure.java.io/reader file)
-                   true))
+(def airplane-angles (range 0 372 12))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
 ;; encoding is problematic, so I rolled my own json from the csv file
-(def all-airports (parse-json "resources/airport-codes_json.json"))
+(def all-airports (utils/parse-json "resources/airport-codes_json.json"))
 
 (def orig-airplane-image (-> "resources/public/airplane_small.png"
                              (io/file)
@@ -60,46 +46,6 @@
       airport
       flight-direction))
 
-;; thanks to user Yuhan Quek in Clojurians
-;; https://clojurians.slack.com/archives/C03S1KBA2/p1570958786346700
-(defn rotate-around-center
-  [img degrees]
-  (let [w   (.getWidth img)
-        h   (.getHeight img)]
-    (c2d/with-canvas-> (c2d/canvas w h)
-      (c2d/translate (/ w 2) (/ h 2))
-      (c2d/rotate (* degrees (/ Math/PI 180)))
-      (c2d/translate (- (/ w 2)) (- (/ h 2)))
-      (c2d/image img)
-      (c2d/get-image))))
-
-(def s3 (aws/client {:api :s3
-                     :region :us-east-1
-                     :credentials-provider (creds/environment-credentials-provider)}))
-
-(defn add-uuid
-  [string uuid extension]
-  (str string uuid extension))
-
-(defn image->bytes!
-  [image angle]
-  (let [output-bytes (java.io.ByteArrayOutputStream.)]
-    (-> image
-        (rotate-around-center angle)
-        (ImageIO/write "png" output-bytes))
-    (.toByteArray output-bytes)))
-
-;; the only thing missing for proper public access was ContentType, otherwise
-;; the file is saved as a stream or whatever
-(defn send-image-s3!
-  [image file-path]
-  (timbre/info "Uploading to" s3-bucket "S3 bucket...")
-  (aws/invoke s3 {:op :PutObject
-                  :request {:Bucket s3-bucket :Key file-path
-                            :Body image
-                            :ACL "public-read"
-                            :ContentType "image/png"}}))
-
 (defn iata->city
   "Matches a IATA code to the city name"
   [iata]
@@ -112,7 +58,7 @@
         url
         {:body (json/generate-string payload)
          :content-type :json})
-      (log-http-status "Slack" "POST")))
+      (utils/log-http-status "Slack" "POST")))
 
 (defn get-api-data!
   "GET an API and pull only the body"
@@ -185,8 +131,11 @@
   [flight]
   (str "Flight " (:flight flight)
        " (" (:aircraft flight) ") "
-       "from " (iata->city (:start flight)) " (" (:start flight) ")"
-       " to " (iata->city (:end flight)) " (" (:end flight) ")"
+       (if (and (empty? (:start flight))
+                (empty? (:end flight)))
+         "with unknown destination"
+         (str "from " (iata->city (:start flight)) " (" (:start flight) ")"
+              " to " (iata->city (:end flight)) " (" (:end flight) ")"))
        " currently moving at " (:speed flight) " km/h over "
        (->> (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
                  (:lat flight) "," (:lon flight) "&key=" maps-api-key)
@@ -211,14 +160,8 @@
   (if (empty? flight)
     {:text (str "Tower observes " (get-weather! "Berlin") ;;FIXME generalize
                 ", no air traffic, over.")}
-    (let [plane-uuid (uuid)
-          plane-url (add-uuid airplane-img-url plane-uuid ".png")
-          plane-path (add-uuid "airplanes/airplane_small_temp_" plane-uuid ".png")]
-      (timbre/info "Rotating image and uploading to S3 with uuid" plane-uuid)
-      ;;FIXME should this S3 upload really be here?
-      (-> (image->bytes! orig-airplane-image (:track flight))
-          (io/input-stream)
-          (send-image-s3! plane-path))
+    (let [plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
+          plane-url (str airplane-img-url (apply int plane-angle) ".png")]
       (timbre/info (str "Creating payload for " flight))
       {:blocks [{:type "section"
                  :text {:type "plain_text"
@@ -244,11 +187,17 @@
       first-flight
       extract-flight))
 
+(defn print-pass
+  [payload]
+  (println payload)
+  payload)
+
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
   (-> (get-flight! airport flight-direction)
       create-payload
+      print-pass
       (post-to-slack! response-url)))
 
 (defn request-flight-direction
