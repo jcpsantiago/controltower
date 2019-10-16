@@ -338,7 +338,7 @@
                         airport "..."))
       (thread (post-flight! airport flight-direction response-url))
       {:status 200
-       :body ""}))
+       :body "Standby..."}))
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 
