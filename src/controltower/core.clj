@@ -10,10 +10,6 @@
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
    [taoensso.timbre :as timbre])
-  (:import
-   [java.awt Graphics2D]
-   [java.awt.image BufferedImage]
-   [javax.imageio ImageIO])
   (:gen-class))
 
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
