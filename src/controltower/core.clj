@@ -60,8 +60,6 @@
       airport
       flight-direction))
 
-
-
 ;; thanks to user Yuhan Quek in Clojurians
 ;; https://clojurians.slack.com/archives/C03S1KBA2/p1570958786346700
 (defn rotate-around-center
@@ -102,7 +100,6 @@
                             :ACL "public-read"
                             :ContentType "image/png"}}))
 
-
 (defn iata->city
   "Matches a IATA code to the city name"
   [iata]
@@ -130,16 +127,15 @@
   (timbre/info "Checking the weather...")
   (:description
    (first (:weather
-            (get-api-data!
-              (str "http://api.openweathermap.org/data/2.5/weather?q=" city
-                   "&appid=" openweather-api-key))))))
+           (get-api-data!
+            (str "http://api.openweathermap.org/data/2.5/weather?q=" city
+                 "&appid=" openweather-api-key))))))
 
 (defn get-address
   "Get address from google maps api reverse geocoding"
   [m]
   (timbre/info "Getting the address with google maps geocoding...")
   (:formatted_address (first (get m :results))))
-
 
 ;; extracting info from flightradar24 API and cleaning everying
 (defn remove-crud
@@ -193,7 +189,7 @@
        " to " (iata->city (:end flight)) " (" (:end flight) ")"
        " currently moving at " (:speed flight) " km/h over "
        (->> (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-              (:lat flight) "," (:lon flight) "&key=" maps-api-key)
+                 (:lat flight) "," (:lon flight) "&key=" maps-api-key)
             get-api-data!
             get-address
             (re-find #"[^,]*"))
@@ -237,8 +233,6 @@
                                                mapbox-api-key)
                  :alt_text "flight overview"}]})))
 
-
-
 (defn get-flight!
   "Calls flightradar24 cleans the data and extracts the first flight"
   [airport flight-direction]
@@ -280,14 +274,13 @@
                          :value "w"
                          :action_id "txl-west"}]}]})
 
-
 ;; routes and handlers
 (defn simple-body-page
   "Simple page for healthchecks"
   [req]
   {:status  200
    :headers {"Content-Type" "text/html"}
-   :body    "Hello World"})
+   :body    "Yep, it's one of those empty pages..."})
 
 (defn which-flight
   "Return the current flight"
@@ -302,7 +295,7 @@
         (do
           (timbre/error "Invalid flight direction!")
           (thread (post-to-slack! (request-flight-direction airport user-id)
-                                 response-url))
+                                  response-url))
           {:status 200
            :body ""})
         (do
@@ -314,38 +307,38 @@
       ;;NOTE the slash command is already set on slack
       (timbre/error "Flight direction is missing! Asking for more info...")
       (thread (post-to-slack! (request-flight-direction airport user-id)
-                             response-url))
+                              response-url))
       {:status 200
        :body ""})))
 
 (defroutes app-routes
   (GET "/" [req] simple-body-page)
   (POST "/which-flight" req
-        (let [request (:params req)
-              user-id (:user_id request)
-              airport (keyword (re-find #"[a-z]+" (:command request)))
-              command-text (:text request)
-              response-url (:response_url request)]
-          (timbre/info (str "Slack user " user-id
-                            " is requesting info. Checking for flights at "
-                            airport "..."))
-          (which-flight user-id airport command-text response-url)))
+    (let [request (:params req)
+          user-id (:user_id request)
+          airport (keyword (re-find #"[a-z]+" (:command request)))
+          command-text (:text request)
+          response-url (:response_url request)]
+      (timbre/info (str "Slack user " user-id
+                        " is requesting info. Checking for flights at "
+                        airport "..."))
+      (which-flight user-id airport command-text response-url)))
   (POST "/which-flight-retry" req
-        (let [request (-> req
-                          :params
-                          :payload
-                          (json/parse-string true))
-              user-id (:id (:user request))
-              received-action (first (:actions request))
-              airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
-              flight-direction (keyword (:value received-action))
-              response-url (:response_url request)]
-          (timbre/info (str "Slack user " user-id
-                            " is retrying. Checking for flights at "
-                            airport "..."))
-          (thread (post-flight! airport flight-direction response-url))
-          {:status 200
-           :body ""}))
+    (let [request (-> req
+                      :params
+                      :payload
+                      (json/parse-string true))
+          user-id (:id (:user request))
+          received-action (first (:actions request))
+          airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
+          flight-direction (keyword (:value received-action))
+          response-url (:response_url request)]
+      (timbre/info (str "Slack user " user-id
+                        " is retrying. Checking for flights at "
+                        airport "..."))
+      (thread (post-flight! airport flight-direction response-url))
+      {:status 200
+       :body ""}))
   (route/resources "/")
   (route/not-found "Error: endpoint not found!"))
 

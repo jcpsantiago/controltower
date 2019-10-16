@@ -17,7 +17,8 @@
                  [mock-clj "0.2.1"]
                  [proto-repl "0.3.1"]
                  [ring/ring-defaults "0.3.2"]]
-  :plugins [[lein-cloverage "1.1.1"]]
+  :plugins [[lein-cloverage "1.1.1"]
+            [lein-cljfmt "0.6.4"]]
   :main ^:skip-aot controltower.core
   :min-lein-version "2.0.0"
   :uberjar-name "controltower.jar"
