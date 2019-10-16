@@ -29,10 +29,6 @@
 ;; encoding is problematic, so I rolled my own json from the csv file
 (def all-airports (utils/parse-json "resources/airport-codes_json.json"))
 
-(def orig-airplane-image (-> "resources/public/airplane_small.png"
-                             (io/file)
-                             (ImageIO/read)))
-
 ;; from https://boundingbox.klokantech.com
 (def bounding-boxes
   {:txl {:e "52.577701,52.558327,13.32212,13.402922"
