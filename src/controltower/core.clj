@@ -2,7 +2,6 @@
   (:require
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
-   [clojure.java.io :as io]
    [clojure.string :refer [upper-case]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
