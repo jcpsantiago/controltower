@@ -255,10 +255,11 @@
   [user-id airport command-text response-url]
   (if (and (contains? bounding-boxes airport)
            (seq command-text))
-    (let [flight-direction (keyword
-                            (first
-                             (re-matches #"(?i)(^e{1}$)|(^w{1}$)"
-                                         command-text)))]
+    (let [flight-direction (-> command-text
+                               ;;FIXME should be dynamic for more directions
+                               (re-matches #"(?i)(^e{1}$)|(^w{1}$)")
+                               first
+                               keyword)]
       (if (nil? flight-direction)
         (do
           (timbre/error "Invalid flight direction!")
