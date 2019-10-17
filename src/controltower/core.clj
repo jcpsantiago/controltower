@@ -3,6 +3,7 @@
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
    [clojure.java.io :as io]
+   [clojure.string :refer [upper-case]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
    [controltower.utils :as utils]
@@ -66,17 +67,38 @@
   "Get current weather condition for a city"
   [city]
   (timbre/info "Checking the weather...")
-  (:description
-   (first (:weather
-           (get-api-data!
-            (str "http://api.openweathermap.org/data/2.5/weather?q=" city
-                 "&appid=" openweather-api-key))))))
+  (-> (str "http://api.openweathermap.org/data/2.5/weather?q=" city
+           "&appid=" openweather-api-key)
+      get-api-data!))
 
-(defn get-address
-  "Get address from google maps api reverse geocoding"
-  [m]
+(defn get-weather-description
+  "Get description for current weather from openweather API response"
+  [weather-response]
+  (-> weather-response
+      :weather
+      first
+      :description))
+
+(defn night?
+  "Determine if it's night or day based on openweather API response"
+  [weather-response]
+  (let [sys (:sys weather-response)
+        localtime (:dt weather-response)
+        sunrise (:sunrise sys)
+        sunset (:sunset sys)]
+    (or (< localtime sunrise) (> localtime sunset))))
+
+(defn create-gmaps-str
+  "Creates the url needed for geocoding an address with google maps API"
+  [latitude longitude]
+  (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
+       latitude "," longitude "&key=" maps-api-key))
+
+(defn get-gmaps-address
+  "Get address from google maps api reverse geocoding response"
+  [results]
   (timbre/info "Getting the address with google maps geocoding...")
-  (:formatted_address (first (get m :results))))
+  (:formatted_address results))
 
 ;; extracting info from flightradar24 API and cleaning everying
 (defn remove-crud
@@ -124,52 +146,62 @@
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight]
-  (str "Flight " (:flight flight)
-       " (" (:aircraft flight) ") "
-       (if (and (empty? (:start flight))
-                (empty? (:end flight)))
-         "with unknown destination"
-         (str "from " (iata->city (:start flight)) " (" (:start flight) ")"
-              " to " (iata->city (:end flight)) " (" (:end flight) ")"))
-       " currently moving at " (:speed flight) " km/h over "
-       (->> (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
-                 (:lat flight) "," (:lon flight) "&key=" maps-api-key)
-            get-api-data!
-            get-address
-            (re-find #"[^,]*"))
-       " at an altitude of " (:altitude flight) " meters."))
+  (let [gmaps-response (-> (create-gmaps-str (:lat flight) (:lon flight))
+                           get-api-data!
+                           :results
+                           first)
+        address (get-gmaps-address (:formatted_address gmaps-response))]
+    (str "Flight " (:flight flight)
+         " (" (:aircraft flight) ") "
+         (if (and (empty? (:start flight))
+                  (empty? (:end flight)))
+           "with unknown destination"
+           (str "from " (iata->city (:start flight)) " (" (:start flight) ")"
+                " to " (iata->city (:end flight)) " (" (:end flight) ")"))
+         " currently moving at " (:speed flight) " km/h over " address
+         " at an altitude of " (:altitude flight) " meters.")))
 
 (defn create-mapbox-str
   "Creates mapbox string for image with map and airplane"
-  [image-url longitude latitude api-key]
-  (str "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/"
-       "url-" image-url
+  [image-url longitude latitude night-mode]
+  (str "https://api.mapbox.com/styles/v1/mapbox/"
+       (if night-mode "dark-v10" "streets-v11")
+       "/static/" "url-" image-url
        "(" longitude "," latitude ")/"
        longitude "," latitude
        ",14,0,0/200x200?attribution=false&logo=false&access_token="
-       api-key))
+       mapbox-api-key))
 
 (defn create-payload
   "Create a map to be converted into JSON for POST"
-  [flight]
-  (if (empty? flight)
-    {:text (str "Tower observes " (get-weather! "Berlin") ;;FIXME generalize
-                ", no air traffic, over.")}
-    (let [plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
-          plane-url (str airplane-img-url (apply int plane-angle) ".png")]
-      (timbre/info (str "Creating payload for " flight))
-      {:blocks [{:type "section"
-                 :text {:type "plain_text"
-                        :text (create-flight-str flight)}}
-                {:type "image"
-                 :title {:type "plain_text"
-                         :text (or (:flight flight) "Flight location")
-                         :emoji true}
-                 :image_url (create-mapbox-str plane-url
-                                               (:lon flight)
-                                               (:lat flight)
-                                               mapbox-api-key)
-                 :alt_text "flight overview"}]})))
+  [flight airport]
+  (let [latitude (:lat flight)
+        longitude (:lon flight)
+        city (-> airport
+                 name
+                 upper-case
+                 iata->city)
+        weather-response (get-weather! city)]
+    (if (empty? flight)
+      (let [weather-description (get-weather-description weather-response)]
+        {:text (str "Tower observes " weather-description
+                    ", no air traffic, over.")})
+      (let [night-mode (night? weather-response)
+            plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
+            plane-url (str airplane-img-url (apply int plane-angle) ".png")]
+        (timbre/info (str "Creating payload for " flight))
+        {:blocks [{:type "section"
+                   :text {:type "plain_text"
+                          :text (create-flight-str flight)}}
+                  {:type "image"
+                   :title {:type "plain_text"
+                           :text (or (:flight flight) "Flight location")
+                           :emoji true}
+                   :image_url (create-mapbox-str plane-url
+                                                 longitude
+                                                 latitude
+                                                 night-mode)
+                   :alt_text "flight overview"}]}))))
 
 (defn get-flight!
   "Calls flightradar24 cleans the data and extracts the first flight"
@@ -186,7 +218,7 @@
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
   (-> (get-flight! airport flight-direction)
-      create-payload
+      (create-payload airport)
       (post-to-slack! response-url)))
 
 (defn request-flight-direction
@@ -254,7 +286,9 @@
   (POST "/which-flight" req
     (let [request (:params req)
           user-id (:user_id request)
-          airport (keyword (re-find #"[a-z]+" (:command request)))
+          airport (->> (:command request)
+                       (re-find #"[a-z]+")
+                       keyword)
           command-text (:text request)
           response-url (:response_url request)]
       (timbre/info (str "Slack user " user-id
