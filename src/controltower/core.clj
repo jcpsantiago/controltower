@@ -39,9 +39,12 @@
       flight-direction))
 
 (defn iata->city
-  "Matches a IATA code to the city name"
+  "Converts a IATA code to the city name"
   [iata]
-  (:municipality (first (filter #(= (:iata_code %) iata) (first all-airports)))))
+  (->> (first all-airports)
+       (filter #(= (:iata_code %) iata))
+       first
+       :municipality))
 
 (defn post-to-slack!
   "Post message to Slack"
@@ -281,4 +284,5 @@
   "This is our main entry point"
   []
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
-  (timbre/info (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
+  (timbre/info
+   (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
