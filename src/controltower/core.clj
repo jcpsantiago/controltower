@@ -32,8 +32,8 @@
          :w "52.300794,52.373924,13.2937,13.463721"}})
 
 (defn get-bounding-box
-  [airport flight-direction]
-  (-> bounding-boxes
+  [boxes airport flight-direction]
+  (-> boxes
       airport
       flight-direction))
 
@@ -76,15 +76,6 @@
       :weather
       first
       :description))
-
-(defn night?
-  "Determine if it's night or day based on openweather API response"
-  [weather-response]
-  (let [sys (:sys weather-response)
-        localtime (:dt weather-response)
-        sunrise (:sunrise sys)
-        sunset (:sunset sys)]
-    (or (< localtime sunrise) (> localtime sunset))))
 
 (defn create-gmaps-str
   "Creates the url needed for geocoding an address with google maps API"
@@ -184,7 +175,7 @@
       (let [weather-description (get-weather-description weather-response)]
         {:text (str "Tower observes " weather-description
                     ", no air traffic, over.")})
-      (let [night-mode (night? weather-response)
+      (let [night-mode (utils/night? weather-response)
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
             plane-url (str airplane-img-url (apply int plane-angle) ".png")]
         (timbre/info (str "Creating payload for " flight))
@@ -205,7 +196,7 @@
   "Calls flightradar24 cleans the data and extracts the first flight"
   [airport flight-direction]
   (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
-           (get-bounding-box airport flight-direction))
+           (get-bounding-box bounding-boxes airport flight-direction))
       get-api-data!
       remove-crud
       filter-landed

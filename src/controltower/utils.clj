@@ -10,16 +10,6 @@
   [x n coll]
   (take n (sort-by #(Math/abs (- x %)) coll)))
 
-(defn uuid
-  "Create a UUID string"
-  []
-  (.toString (java.util.UUID/randomUUID)))
-
-(defn add-uuid
-  "Add UUID to filename path with file extension"
-  [string uuid extension]
-  (str string uuid extension))
-
 (defn parse-json
   "Parse JSON into a map with keys"
   [file]
@@ -32,3 +22,12 @@
   (if (not (= status 200))
     (timbre/error "Failed, exception is" body)
     (timbre/info (str service " async HTTP " type " success: ") status)))
+
+(defn night?
+  "Determine if it's night or day based on openweather API response"
+  [weather-response]
+  (let [sys (:sys weather-response)
+        localtime (:dt weather-response)
+        sunrise (:sunrise sys)
+        sunset (:sunset sys)]
+    (or (< localtime sunrise) (> localtime sunset))))
