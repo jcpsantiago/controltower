@@ -17,7 +17,6 @@
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
-(def s3-bucket (System/getenv "CONTROL_TOWER_S3_BUCKET"))
 (def airplane-angles (range 0 372 12))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
