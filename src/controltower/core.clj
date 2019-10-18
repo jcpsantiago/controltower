@@ -83,12 +83,6 @@
   (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
        latitude "," longitude "&key=" maps-api-key))
 
-(defn get-gmaps-address
-  "Get address from google maps api reverse geocoding response"
-  [results]
-  (timbre/info "Getting the address with google maps geocoding...")
-  (:formatted_address results))
-
 ;; extracting info from flightradar24 API and cleaning everying
 (defn remove-crud
   "Remove irrelevant fields from flightradar24"
@@ -139,7 +133,7 @@
                            get-api-data!
                            :results
                            first)
-        address (get-gmaps-address (:formatted_address gmaps-response))]
+        address (:formatted_address gmaps-response)]
     (str "Flight " (:flight flight)
          " (" (:aircraft flight) ") "
          (if (and (empty? (:start flight))
