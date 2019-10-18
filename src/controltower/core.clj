@@ -5,6 +5,7 @@
    [clojure.string :refer [upper-case]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
+   [controltower.landingpage :as landingpage]
    [controltower.utils :as utils]
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
@@ -266,7 +267,7 @@
        :body ""})))
 
 (defroutes app-routes
-  (GET "/" [req] simple-body-page)
+  (GET "/" [] (landingpage/homepage))
   (POST "/which-flight" req
     (let [request (:params req)
           user-id (:user_id request)

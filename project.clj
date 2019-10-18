@@ -9,6 +9,7 @@
                  [org.clojure/clojure "1.10.0"]
                  [org.clojure/core.async "0.4.500"]
                  [org.clojure/data.json "0.2.6"]
+                 [hiccup "1.0.5"]
                  [http-kit "2.4.0-alpha3"]
                  [mock-clj "0.2.1"]
                  [proto-repl "0.3.1"]

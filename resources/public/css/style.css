@@ -1,0 +1,14 @@
+html {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  height: 100%;
+  margin: 0;
+  background-repeat: no-repeat;
+  background-image: linear-gradient(
+    0deg, #2e8a47 0%, #369665 16%,
+    #3aa282 33%, #3aaea1 50%,
+    #36bbbf 66%, #2ac7df 83%, #00d4ff 100%);
+}
