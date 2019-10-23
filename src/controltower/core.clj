@@ -268,6 +268,7 @@
 
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
+  (GET "/slack" [] (landingpage/homepage))
   (POST "/which-flight" req
     (let [request (:params req)
           user-id (:user_id request)

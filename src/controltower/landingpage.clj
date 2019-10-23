@@ -16,7 +16,14 @@
           [:meta {:name "viewport"
                   :content "width=device-width, initial-scale=1.0"}]]
          [:body
-          [:div {:class "w-100 fixed"}
-           [:div {:class "w-90 center"}
-            [:h1 {:class "mb0 f3 f3-ns f3-l ttu tracked-mega"}
-             [:a {:class "link white" :href "/"} "Control Tower"]]]]]))
+          [:div {:class "ph3"}
+           [:div {:class "w-70 mt3 center"}
+            [:img {:src "/img/drawing.svg" :style "width:15%"}]]
+          [:div {:class "w-70 mt4 center flex flex-column"}
+            [:div {:class "fl w-50 mt3 ph3"}
+              [:video {:autoplay "" :class "mw-100"}
+                [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
+            [:div {:class "fl w-50 pa2 ph3"}
+              [:p {:class "f1" :style "font-weight:200"}
+                "The best slack bot\n"
+                [:p {:class "f2"} "to waste your time"]]]]]]))
