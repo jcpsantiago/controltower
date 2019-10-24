@@ -17,13 +17,19 @@
                   :content "width=device-width, initial-scale=1.0"}]]
          [:body
           [:div {:class "ph3"}
-           [:div {:class "w-70 mt3 center"}
-            [:img {:src "/img/drawing.svg" :style "width:15%"}]]
-          [:div {:class "w-70 mt4 center flex flex-column"}
-            [:div {:class "fl w-50 mt3 ph3"}
-              [:video {:autoplay "" :class "mw-100"}
-                [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
-            [:div {:class "fl w-50 pa2 ph3"}
-              [:p {:class "f1" :style "font-weight:200"}
-                "The best slack bot\n"
-                [:p {:class "f2"} "to waste your time"]]]]]]))
+           [:div {:class "w-80-ns w-90 mt4 center"}
+            [:img {:src "/img/drawing.svg" :class "mw4"}]]
+           [:div {:class "cf w-80 mt5 center"}
+             [:div {:class "fl w-100 w-third-ns ph3"}
+               [:video {:autoplay "" :class "mw5 h-50 right"}
+                 [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
+             [:div {:class "fl w-100 w-two-thirds-ns pa2 ph3"}
+                [:p {:class "f2 mt0 mb0" :style "font-weight:200"}
+                 "The best slack bot"
+                 [:p {:class "f1 mt0 mb1"} "to lower productivity"]]
+                [:p "We were tired of looking out of the window and wondering."]
+                [:p "Then did this, and our lives changed forever."]
+              [:a {:href "https://slack.com/oauth/authorize?scope=commands&client_id=110684212641.693659198309"}
+               [:img {:alt "Add to slack" :height 40 :width 139
+                      :src "https://platform.slack-edge.com/img/add_to_slack.png"
+                      :srcset "https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"}]]]]]]))
