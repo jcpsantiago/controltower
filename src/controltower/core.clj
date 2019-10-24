@@ -25,7 +25,7 @@
                          "0.0.0.0"))
 
 (def db {:dbtype "postgresql"
-         :host postgresql-host})
+         :connection-uri postgresql-host})
 (def ds (jdbc/get-datasource db))
 
 (defn migrated? []
