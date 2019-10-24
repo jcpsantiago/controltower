@@ -5,6 +5,8 @@
    [taoensso.timbre :as timbre])
   (:gen-class))
 
+(defn uuid [] (.toString (java.util.UUID/randomUUID)))
+
 (defn closest-int
   "Return a list of the n items of coll that are closest to x"
   [x n coll]

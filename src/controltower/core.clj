@@ -10,7 +10,9 @@
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
-   [taoensso.timbre :as timbre])
+   [taoensso.timbre :as timbre]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql])
   (:gen-class))
 
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
@@ -19,6 +21,33 @@
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def airplane-angles (range 0 372 12))
+(def postgresql-host (or (System/getenv "DATABASE_URL")
+                         "0.0.0.0"))
+
+(def db {:dbtype "postgresql"
+         :host postgresql-host})
+(def ds (jdbc/get-datasource db))
+
+(defn migrated? []
+  (-> (sql/query ds
+                 [(str "select * from information_schema.tables "
+                       "where table_name='requests'")])
+      count pos?))
+
+(defn migrate []
+  (when (not (migrated?))
+    (timbre/info "Creating database structure...")
+    (jdbc/execute! ds ["
+      create table requests (
+        id varchar(255) primary key,
+        user_id varchar(255),
+        team_domain varchar(255),
+        airport varchar(255),
+        direction varchar(255),
+        is_retry int,
+        created_at timestamp default current_timestamp
+      )"])
+    (timbre/info "...done!")))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
@@ -270,8 +299,10 @@
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" [] (landingpage/homepage))
   (POST "/which-flight" req
-    (let [request (:params req)
+    (let [request-id (utils/uuid)
+          request (:params req)
           user-id (:user_id request)
+          team-domain (:team_domain request)
           airport (->> (:command request)
                        (re-find #"[a-z]+")
                        keyword)
@@ -280,13 +311,19 @@
       (timbre/info (str "Slack user " user-id
                         " is requesting info. Checking for flights at "
                         airport "..."))
+      (timbre/info (str "request_id:" request-id " saving request in database"))
+      (sql/insert! ds :requests {:id request-id :user_id user-id
+                                 :team_domain team-domain :airport (name airport)
+                                 :direction command-text :is_retry 0})
       (which-flight user-id airport command-text response-url)))
   (POST "/which-flight-retry" req
-    (let [request (-> req
+    (let [request-id (utils/uuid)
+          request (-> req
                       :params
                       :payload
                       (json/parse-string true))
           user-id (:id (:user request))
+          team-domain (:domain (:team request))
           received-action (first (:actions request))
           airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
           flight-direction (keyword (:value received-action))
@@ -294,6 +331,9 @@
       (timbre/info (str "Slack user " user-id
                         " is retrying. Checking for flights at "
                         airport "..."))
+      (sql/insert! ds :requests {:id request-id :user_id user-id
+                                 :team_domain team-domain :airport (name airport)
+                                 :direction (name flight-direction) :is_retry 1})
       (thread (post-flight! airport flight-direction response-url))
       {:status 200
        :body "Standby..."}))
@@ -303,6 +343,7 @@
 (defn -main
   "This is our main entry point"
   []
+  (migrate)
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
   (timbre/info
    (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
