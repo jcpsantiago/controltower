@@ -15,7 +15,7 @@
                  [mock-clj "0.2.1"]
                  [proto-repl "0.3.1"]
                  [ring/ring-defaults "0.3.2"]
-                 [seancorfield/next.jdbc "1.0.9"]]
+                 [org.clojure/java.jdbc "0.7.10"]]
   :plugins [[lein-cloverage "1.1.1"]
             [lein-cljfmt "0.6.4"]]
   :main ^:skip-aot controltower.core
