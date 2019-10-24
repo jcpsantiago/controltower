@@ -25,8 +25,8 @@
                  [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
              [:div {:class "fl w-100 w-two-thirds-ns pa2 ph3"}
                 [:p {:class "f2 mt0 mb0" :style "font-weight:200"}
-                 "The best slack bot"
-                 [:p {:class "f1 mt0 mb1"} "to lower productivity"]]
+                 "The best bot"
+                 [:p {:class "f1 mt0 mb1"} "to slack off at work"]]
                 [:p "We were tired of looking out of the window and wondering."]
                 [:p "Then did this, and our lives changed forever."]
               [:a {:href "https://slack.com/oauth/authorize?scope=commands&client_id=110684212641.693659198309"}
