@@ -11,8 +11,8 @@
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
    [taoensso.timbre :as timbre]
-   [clojure.java.jdbc :as sql])
-   ;;[next.jdbc.sql :as sql])
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql])
   (:gen-class))
 
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
@@ -21,34 +21,34 @@
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def airplane-angles (range 0 372 12))
-(def db-spec (or (System/getenv "DATABASE_URL")
-                 "0.0.0.0"))
+(def postgresql-host (or (System/getenv "DATABASE_URL")
+                         "0.0.0.0"))
 
-(def db {:dbtype "postgresql"
-         :connection-uri postgresql-host})
-;(def ds (jdbc/get-datasource db))
+
+
+(def db (utils/create-map-from-uri postgresql-host))
+(def ds (jdbc/get-datasource db))
 
 (defn migrated? []
-  (-> (sql/query spec
-                 [(str "select count(*) from information_schema.tables "
+  (-> (sql/query ds
+                 [(str "select * from information_schema.tables "
                        "where table_name='requests'")])
-      first :count pos?))
+      count pos?))
 
 (defn migrate []
   (when (not (migrated?))
-    (print "Creating database structure...") (flush)
-    (sql/db-do-commands spec
-                        (sql/create-table-ddl
-                         :requests
-                         [[:id :varchar "PRIMARY KEY"]
-                          [:user_id :varchar]
-                          [:team_domain :varchar]
-                          [:airport :varchar]
-                          [:direction :varchar]
-                          [:is_retry :int]
-                          [:created_at :timestamp
-                           "NOT NULL" "DEFAULT CURRENT_TIMESTAMP"]]))
-    (println " done")))
+    (timbre/info "Creating database structure...")
+    (jdbc/execute! ds ["
+      create table requests (
+        id varchar(255) primary key,
+        user_id varchar(255),
+        team_domain varchar(255),
+        airport varchar(255),
+        direction varchar(255),
+        is_retry int,
+        created_at timestamp default current_timestamp
+      )"])
+    (timbre/info "...done!")))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License

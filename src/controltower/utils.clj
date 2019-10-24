@@ -2,10 +2,21 @@
   (:require
    [cheshire.core :as json]
    [clojure.java.io :as io]
-   [taoensso.timbre :as timbre])
+   [taoensso.timbre :as timbre]
+   [clojure.string :as s])
   (:gen-class))
 
 (defn uuid [] (.toString (java.util.UUID/randomUUID)))
+
+(defn parse-db-uri
+  [uri]
+  (drop 1 (s/split uri #"://|:|@|/")))
+
+(defn create-map-from-uri
+  [uri]
+  (let [parsed (parse-db-uri uri)]
+    (into {:dbtype "postgresql"}
+      (zipmap [:user :password :host :port :dbname] parsed))))
 
 (defn closest-int
   "Return a list of the n items of coll that are closest to x"
