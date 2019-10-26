@@ -16,14 +16,14 @@
           [:meta {:name "viewport"
                   :content "width=device-width, initial-scale=1.0"}]]
          [:body
-          [:div {:class "ph3"}
-           [:div {:class "w-80-ns w-90 mt4 center"}
+          [:div {:class "cf ph3"}
+           [:nav {:class "w-90 w-80-ns mt4 center"}
             [:img {:src "/img/drawing.svg" :class "mw4"}]]
-           [:div {:class "cf w-80 mt5 center"}
+           [:div {:class "w-90 w-80-ns mt5 center"}
              [:div {:class "fl w-100 w-third-ns ph3"}
-               [:video {:autoplay "" :class "mw5 h-50 right"}
+               [:video {:autoplay "" :class "mw-100"}
                  [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
-             [:div {:class "fl w-100 w-two-thirds-ns pa2 ph3"}
+             [:div {:class "fl w-100 w-two-thirds-ns pa2 ph3 mt4 mt0-ns"}
                 [:p {:class "f2 mt0 mb0" :style "font-weight:200"}
                  "The best bot"
                  [:p {:class "f1 mt0 mb1"} "to slack off at work"]]
@@ -32,4 +32,14 @@
               [:a {:href "https://slack.com/oauth/authorize?scope=commands&client_id=110684212641.693659198309"}
                [:img {:alt "Add to slack" :height 40 :width 139
                       :src "https://platform.slack-edge.com/img/add_to_slack.png"
-                      :srcset "https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"}]]]]]]))
+                      :srcset "https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"}]]]]
+           [:footer {:class "fl w-90 w-80-ns pv4 ph3 ph5-m ph6-l moon-gray center"}
+            [:small {:class "f6 db tc"} "©"
+             [:b {:class "ttu"} "UNLIMITED BUDGET LLC"] " (not a real company)"]
+            [:small {:class "tc mt3"}
+             "Made with "
+             [:svg {:width 14 :height 10 :viewBox "335 8 14 10"
+                    :xmlns "http://www.w3.org/2000/svg"}
+              [:path {:d "M342 10.874c.273-.86.69-1.512 1.252-1.956.562-.444 1.243-.667 2.044-.667.947 0 1.71.29 2.285.87.577.578.865 1.343.865 2.296 0 .834-.2 1.506-.6 2.014-.4.508-1.17 1-2.307 1.48l-.147.065c-1.864.786-2.994 1.665-3.39 2.637-.405-.977-1.533-1.856-3.384-2.637a4.018 4.018 0 0 0-.16-.066c-1.144-.48-1.914-.97-2.312-1.473-.398-.503-.597-1.177-.597-2.02 0-.954.29-1.72.868-2.298.58-.58 1.34-.87 2.282-.87.805 0 1.488.224 2.047.668.56.444.978 1.096 1.256 1.956z"
+                      :fill "#ccc" :opacity ".5" :fill-rule "evenodd"}]]
+             " and mate in Berlin"]]]]))
