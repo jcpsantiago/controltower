@@ -13,3 +13,4 @@ pom.xml.asc
 .DS_Store
 resources/public/airplane_small_temp.png
 resources/public/airplanes*
+resources/public/logos
