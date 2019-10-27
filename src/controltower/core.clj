@@ -191,6 +191,7 @@
   [flight airport]
   (let [latitude (:lat flight)
         longitude (:lon flight)
+        airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
         city (-> airport
                  name
                  upper-case
@@ -202,7 +203,8 @@
                     ", no air traffic, over.")})
       (let [night-mode (utils/night? weather-response)
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
-            plane-url (str airplane-img-url (apply int plane-angle) ".png")]
+            plane-url (str (utils/replace-airline-iata airplane-img-url airline-iata)
+                           (apply int plane-angle) ".png")]
         (timbre/info (str "Creating payload for " flight))
         {:blocks [{:type "section"
                    :text {:type "plain_text"
