@@ -191,7 +191,6 @@
   [flight airport]
   (let [latitude (:lat flight)
         longitude (:lon flight)
-        airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
         city (-> airport
                  name
                  upper-case
