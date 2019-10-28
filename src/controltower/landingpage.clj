@@ -21,7 +21,7 @@
             [:img {:src "/img/drawing.svg" :class "mw4"}]]
            [:div {:class "flex flex-wrap-reverse w-90 w-80-ns mt5 center items-center"}
              [:div {:class "fl w-100 w-third-ns mt5 mt0-ns pr3-m pr5-ns"}
-               [:video {:autoplay "" :class "mw-90"}
+               [:video {:autoplay "" :class "mw-100"}
                  [:source {:src "vid/slack_mockup.mp4" :type "video/mp4"}]]]
              [:div {:class "w-100 w-two-thirds-ns ph2 pr4-ns"}
                 [:p {:class "f3 f2-ns mt0 mb0" :style "font-weight:200"}
