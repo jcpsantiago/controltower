@@ -202,6 +202,7 @@
         {:text (str "Tower observes " weather-description
                     ", no air traffic, over.")})
       (let [night-mode (utils/night? weather-response)
+            airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
             plane-url (str (utils/replace-airline-iata airplane-img-url airline-iata)
                            (apply int plane-angle) ".png")]
