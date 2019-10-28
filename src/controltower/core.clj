@@ -21,12 +21,14 @@
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def airplane-angles (range 0 372 12))
-(def postgresql-host (or (System/getenv "DATABASE_URL")
-                         "0.0.0.0"))
+(def postgresql-host (let [heroku-url (System/getenv "DATABASE_URL")]
+                       (if (nil? heroku-url)
+                         {:host "0.0.0.0"
+                          :user "postgres"
+                          :dbtype "postgresql"}
+                         (utils/create-map-from-uri heroku-url))))
 
-
-
-(def db (utils/create-map-from-uri postgresql-host))
+(def db postgresql-host)
 (def ds (jdbc/get-datasource db))
 
 (defn migrated? []
