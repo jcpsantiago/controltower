@@ -48,6 +48,9 @@
       create table requests (
         id varchar(255) primary key,
         user_id varchar(255),
+        team_id varchar(255),
+        channel_id varchar(255),
+        channel_name varchar(255),
         team_domain varchar(255),
         airport varchar(255),
         direction varchar(255),
@@ -355,7 +358,6 @@
     (let [request-id (utils/uuid)
           request (:params req)
           user-id (:user_id request)
-          team-domain (:team_domain request)
           airport (->> (:command request)
                        (re-find #"[a-z]+")
                        keyword)
@@ -366,8 +368,13 @@
                         airport "..."))
       (timbre/info (str "request_id:" request-id " saving request in database"))
       (sql/insert! ds :requests {:id request-id :user_id user-id
-                                 :team_domain team-domain :airport (name airport)
-                                 :direction command-text :is_retry 0})
+                                 :team_domain (:team_domain request)
+                                 :team_id (:team_id request)
+                                 :channel_id (:channel_id request)
+                                 :channel_name (:channel_name request)
+                                 :airport (name airport)
+                                 :direction command-text
+                                 :is_retry 0})
       (which-flight user-id airport command-text response-url)))
   (POST "/which-flight-retry" req
     (let [request-id (utils/uuid)
@@ -376,7 +383,6 @@
                       :payload
                       (json/parse-string true))
           user-id (:id (:user request))
-          team-domain (:domain (:team request))
           received-action (first (:actions request))
           airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
           flight-direction (keyword (:value received-action))
@@ -385,8 +391,13 @@
                         " is retrying. Checking for flights at "
                         airport "..."))
       (sql/insert! ds :requests {:id request-id :user_id user-id
-                                 :team_domain team-domain :airport (name airport)
-                                 :direction (name flight-direction) :is_retry 1})
+                                 :team_domain (:domain (:team request))
+                                 :team_id (:id (:team request))
+                                 :channel_id (:id (:channel request))
+                                 :channel_name (:name (:channel request))
+                                 :airport (name airport)
+                                 :direction (name flight-direction)
+                                 :is_retry 1})
       (thread (post-flight! airport flight-direction response-url))
       {:status 200
        :body "Standby..."}))
