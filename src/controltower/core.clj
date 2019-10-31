@@ -27,19 +27,23 @@
                           :user "postgres"
                           :dbtype "postgresql"}
                          (utils/create-map-from-uri heroku-url))))
+(def slack-client-id (System/getenv "CONTROL_TOWER_CLIENT_ID"))
+(def slack-client-secret (System/getenv "CONTROL_TOWER_CLIENT_SECRET"))
+(def slack-oauth-url-state (System/getenv "CONTROL_TOWER_SLACK_OAUTH_STATE"))
 
 (def db postgresql-host)
 (def ds (jdbc/get-datasource db))
 
-(defn migrated? []
+(defn migrated?
+  [table]
   (-> (sql/query ds
                  [(str "select * from information_schema.tables "
-                       "where table_name='requests'")])
+                       "where table_name='" table "'")])
       count pos?))
 
 (defn migrate []
-  (when (not (migrated?))
-    (timbre/info "Creating database structure...")
+  (when (not (migrated? "requests"))
+    (timbre/info "Creating requests table...")
     (jdbc/execute! ds ["
       create table requests (
         id varchar(255) primary key,
@@ -49,8 +53,20 @@
         direction varchar(255),
         is_retry int,
         created_at timestamp default current_timestamp
-      )"])
-    (timbre/info "...done!")))
+      )"]))
+  (when (not (migrated? "connected_teams"))
+    (timbre/info "Creating connected_teams table...")
+    (jdbc/execute! ds ["
+        create table connected_teams (
+          id serial primary key,
+          slack_team_id varchar(255),
+          team_name varchar(255),
+          registering_user varchar (255),
+          scope varchar(255),
+          access_token varchar(255),
+          created_at timestamp default current_timestamp
+        )"]))
+  (timbre/info "Database ready!"))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
@@ -300,9 +316,41 @@
       {:status 200
        :body ""})))
 
+(defn insert-slack-token!
+  [access-token-response connection]
+  (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
+                                            :team_name (:team_name access-token-response)
+                                            :registering_user (:user_id access-token-response)
+                                            :scope (:scope access-token-response)
+                                            :access_token (:access_token access-token-response)})
+
+  (timbre/info (str "Done! Team " (:team_name access-token-response)
+                    " is connected!")))
+
+(defn slack-access-token!
+  [request]
+  (println request)
+  (if (= (:state request) slack-oauth-url-state)
+    (do
+      (timbre/info "Replying to Slack OAuth and saving token to db")
+      (-> @(http/post "https://slack.com/api/oauth.access"
+                      {:form-params {:client_id slack-client-id
+                                     :client_secret slack-client-secret
+                                     :code (:code request)
+                                     :state slack-oauth-url-state}})
+           :body
+           (json/parse-string true)
+           (insert-slack-token! ds)))
+    (timbre/error "OAuth state parameter didn't match!")))
+
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
-  (GET "/slack" [] (landingpage/homepage))
+  (GET "/slack" req
+       (let [request (:params req)]
+         (timbre/info "Received OAuth approval from Slack!")
+         (thread (slack-access-token! request))
+         (landingpage/homepage)))
+
   (POST "/which-flight" req
     (let [request-id (utils/uuid)
           request (:params req)

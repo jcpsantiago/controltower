@@ -4,6 +4,8 @@
    [hiccup.page :refer :all])
   (:gen-class))
 
+(def slack-oauth-url-state (System/getenv "CONTROL_TOWER_SLACK_OAUTH_STATE"))
+
 (defn homepage
   "Single page website"
   []
@@ -29,7 +31,8 @@
                 [:p {:class "f2 f1-ns mt0 lh-title"} "to slack off at work"]
                 [:p {:class "mb1"} "We were tired of looking out of the window and wondering."]
                 [:p {:class "mt0 lh-copy"} "Then did this, and our lives changed forever."]
-              [:a {:href "https://slack.com/oauth/authorize?scope=commands&client_id=817564915318.803887856067"}
+              [:a {:href (str "https://slack.com/oauth/authorize?scope=commands&client_id=817564915318.803887856067&state="
+                              slack-oauth-url-state)}
                [:img {:alt "Add to slack" :height 40 :width 139
                       :src "https://platform.slack-edge.com/img/add_to_slack.png"
                       :srcset "https://platform.slack-edge.com/img/add_to_slack.png 1x, https://platform.slack-edge.com/img/add_to_slack@2x.png 2x"}]]]]
