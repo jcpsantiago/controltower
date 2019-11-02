@@ -35,19 +35,19 @@
              [:img {:src "/img/ct_logo.svg" :class "mw1 pr2"}]
              [:a {:class "f5 black code b link"
                   :href ""} "ControlTower"]
-             [:div {:class "flex-auto"}]
-             [:div
-              [:nav {:class "tc lh-title flex"}
-               [:a {:class "f5 black code tr no-underline underline-hover"
-                    :href "#"} "About"]]]]
+             [:div {:class "flex-auto"}]]
+             ;;[:div
+             ;; [:nav {:class "tc lh-title flex"}
+              ;; [:a {:class "f5 black code tr no-underline underline-hover"
+                ;;    :href "#"} "About"]]
 
             [:div {:class "vh-100 flex flex-wrap-reverse w-90 w-80-ns center"}
              [:div {:class "w-100 w-two-thirds-ns ph2 pr4-ns center"}
               [:h2 {:class "f3 f2-ns mt0 mb0" :style "font-weight:200"}
                "The best bot"]
               [:h1 {:class "f2 f1-ns mt0 lh-title"} "to slack off at work"]
-              [:p {:class "mb1"} "We were tired of looking out of the window and wondering."]
-              [:p {:class "mt0 lh-copy"} "Then did this, and our lives changed forever."]
+              [:p {:class "mb1"} "There are countless apps out there to increase your productivity. But how many make you smile?"]
+              [:p {:class "mt0 lh-copy"} "Take a deep breath, look to the skies and focus on something else for a moment. Your eyes will thank you, your brain will reward you with soothing serotonine, and you'll finally figure out that nagging problem in the back of your head."]
               add-slack-btn]]
 
 
@@ -64,26 +64,32 @@
              [:div {:class "x5"}
               [:div {:class "cloud"}]]]]
 
-           [:div {:class "w-70 center"}
-            [:img {:src "img/screenshot.png"
-                   :class ""}]]
+           [:div {:class "vh-100 w-100 w-70-ns center"}
+            ;; https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/url-https%3A%2F%2Fc764e6eb.ngrok.io%2FEW.png(13.214952,52.553030)/13.214952,52.553030,14,0,0/400x400@2x?attribution=false&logo=false&access_token=pk.eyJ1IjoiamNwc2FudGlhZ28iLCJhIjoiY2sxdHAwcm83MHFhNTNtdDYwNjY2dGthYSJ9.wYJZDRIGi8Shn1y5y57Svw
+            [:p {:class "mv4 f3 lh-copy mh3 w-70-ns center"}
+             "Flight EW2000 (A319) from Stuttgart (STR) to Berlin (TXL), currently moving at 325 km/h over Hakenfelde, Berlin, Germany at an altitude of 693 meters."]
+            [:div {:class "w-70-ns center tc"}
+             [:img {:src "screenshots/flight_screenshot.png"
+                    :class "mw-100 mw6-ns"}]]]
 
-           [:div {:class "w-80 w-40-ns center"}
-            [:h1 {:class ""} "Skies full of colors"]
-            [:p {:class "copy"} "Our state-of-the-art technology produces airplane liveries matching each airline's most common color. Over 200 airlines available!"]]
-           [:div {:class "w-90 w-70-ns center mv4 justify-between-ns flex-ns"}
-            [:div {:class "ph3 tc"}
-             [:img {:src "/img/U2.svg"
-                    :class "mw5 flex-ns mb2 dn"}]
-             [:span {:class "code dn db-ns"} "EasyJet"]]
-            [:div {:class "ph3 tc"}
-             [:img {:src "/img/KL.svg"
-                    :class "mw5 flex-ns mb2 dn"}]
-             [:span {:class "code dn db-ns"} "KLM"]]
-            [:div {:class "ph3 tc"}
-             [:img {:src "/img/EY.svg"
-                    :class "mw5 flex-ns mb2"}]
-             [:span {:class "code"} "Etihad"]]]
+           [:div {:class "vh-100 pv4 bg-light-blue"}
+            [:div {:class ""}
+             [:div {:class "w-80 w-40-ns center"}
+              [:h1 {:class ""} "Skies full of colors"]
+              [:p {:class "copy"} "Our state-of-the-art technology produces airplane liveries matching each airline's most common color. Over 200 airlines available!"]]
+             [:div {:class "w-90 w-70-ns center mv5 justify-around-ns flex-ns"}
+              [:div {:class "ph3 tc"}
+               [:img {:src "/img/TP.svg"
+                      :class "mw5 flex-ns mb2 dn"}]
+               [:span {:class "code dn db-ns"} "TAP Portugal"]]
+              [:div {:class "ph3 tc"}
+               [:img {:src "/img/NH.svg"
+                      :class "mw5 flex-ns mb2 dn"}]
+               [:span {:class "code dn db-ns"} "All Nippon Airways"]]
+              [:div {:class "ph3 tc"}
+               [:img {:src "/img/EY.svg"
+                      :class "mw5 flex-ns mb2"}]
+               [:span {:class "code"} "Etihad"]]]]]
 
            [:footer {:class "w-100 pv4 ph3 ph5-m ph6-l moon-gray mt5 v-btm"}
             [:small {:class "tc db mt3"}
