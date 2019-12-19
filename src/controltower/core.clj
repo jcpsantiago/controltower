@@ -67,6 +67,7 @@
           registering_user varchar (255),
           scope varchar(255),
           access_token varchar(255),
+          webhook_channel varchar(255),
           webhook_url varchar(255),
           created_at timestamp default current_timestamp
         )"]))
@@ -290,21 +291,38 @@
    :headers {"Content-Type" "text/html"}
    :body    "Yep, it's one of those empty pages..."})
 
+(defn get-webhook-vars
+  [slack-team-id]
+  (-> (sql/query ds
+                 [(str "select webhook_channel_id, webhook_url, webhook_channel "
+                       "from connected_teams where slack_team_id = '"
+                       slack-team-id "'")]
+                 {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
+      first))
+
 (defn which-flight
   "Return the current flight"
-  [user-id airport command-text response-url]
+  [user-id airport command-text request]
   (if (and (contains? bounding-boxes airport)
            (seq command-text))
     (let [flight-direction (->> command-text
                                 ;;FIXME should be dynamic for more directions
                                 (re-matches #"(?i)(^e{1}$)|(^w{1}$)")
                                 first
-                                keyword)]
+                                keyword)
+          team-id (:team_id request)
+          webhook-vars (get-webhook-vars (:team_id request))
+          webhook-channel-id (:webhook_channel_id webhook-vars)
+          webhook-url (:webhook_url webhook-vars)
+          channel-id (:channel_id request)
+          response-url (if (= channel-id webhook-channel-id)
+                         webhook-url
+                         (:response_url request))]
       (if (nil? flight-direction)
         (do
           (timbre/error "Invalid flight direction!")
           (thread (post-to-slack! (request-flight-direction airport user-id)
-                                  response-url))
+                                  (:response_url request)))
           {:status 200
            :body ""})
         (do
@@ -316,7 +334,7 @@
       ;;NOTE the slash command is already set on slack
       (timbre/error "Flight direction is missing! Asking for more info...")
       (thread (post-to-slack! (request-flight-direction airport user-id)
-                              response-url))
+                              (:response_url request)))
       {:status 200
        :body ""})))
 
@@ -359,13 +377,6 @@
                        "where table_name='" table "'")])
       count pos?))
 
-(defn get-webhook-vars
-  [slack-team-id]
-  (sql/query ds
-             [(str "select webhook_channel, webhook_url "
-                   "from connected_teams where slack_team_id = '"
-                   slack-team-id "'")]))
-
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
@@ -378,18 +389,12 @@
   (POST "/which-flight" req
     (let [request-id (utils/uuid)
           request (:params req)
-          webhook-vars (get-webhook-vars (:team_id request))
-          webhook-channel (:webhook_channel webhook-vars)
-          webhook-url (:webhook_url webhook-vars)
-          channel (:channel_name request)
+
           user-id (:user_id request)
           airport (->> (:command request)
                        (re-find #"[a-z]+")
                        keyword)
-          command-text (:text request)
-          response-url (if (= channel webhook-channel)
-                           webhook-url
-                           (:response_url request))]
+          command-text (:text request)]
       (timbre/info (str "Slack user " user-id
                         " is requesting info. Checking for flights at "
                         airport "..."))
@@ -402,7 +407,7 @@
                                  :airport (name airport)
                                  :direction command-text
                                  :is_retry 0})
-      (which-flight user-id airport command-text response-url)))
+      (which-flight user-id airport command-text request)))
   (POST "/which-flight-retry" req
     (let [request-id (utils/uuid)
           request (-> req
@@ -413,7 +418,14 @@
           received-action (first (:actions request))
           airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
           flight-direction (keyword (:value received-action))
-          response-url (:response_url request)]
+          team-id (:team_id request)
+          webhook-vars (get-webhook-vars (:team_id request))
+          webhook-channel-id (:webhook_channel_id webhook-vars)
+          webhook-url (:webhook_url webhook-vars)
+          channel-id (:channel_id request)
+          response-url (if (= channel-id webhook-channel-id)
+                         webhook-url
+                         (:response_url request))]
       (timbre/info (str "Slack user " user-id
                         " is retrying. Checking for flights at "
                         airport "..."))
