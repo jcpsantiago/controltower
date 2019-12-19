@@ -20,3 +20,13 @@ On Slack the bot needs permissions for slash commands, and incoming hooks. We ha
 * Running the spotting commands on the designated channel will post a response to that channel, visible to members
 * Running the commands anywhere else will also post to the designated channel openly, but also immediately to wherever you executed the command, but visible only to you -- this way you don't need to change channels
 * Currently only two commands are available: `/txl` and `/sxf` for Tegel and Schönefeld airports, respectively. More are TBA. 
+
+## Disclaimer
+
+Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a>
+
+Maps from [MapBox](https://www.mapbox.com/) and [OpenStreetMap](https://www.openstreetmap.org)
+
+# License
+
+Eclipse Public License 2.0
