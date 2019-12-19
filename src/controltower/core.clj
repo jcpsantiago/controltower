@@ -358,14 +358,14 @@
           received-action (first (:actions request))
           airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
           flight-direction (keyword (:value received-action))
-          team-id (:team_id request)
-          webhook-vars (get-webhook-vars! (:team_id request))
+          team-id (:id (:team request))
+          webhook-vars (get-webhook-vars! team-id)
           webhook-channel-id (:webhook_channel_id webhook-vars)
           webhook-url (:webhook_url webhook-vars)
           channel-id (:id (:channel request))
           response-url (if (= channel-id webhook-channel-id)
-                         webhook-url
-                         (:response_url request))]
+                           webhook-url
+                           (:response_url request))]
       (timbre/info (str "Slack user " user-id
                         " is retrying. Checking for flights at "
                         airport "..."))
