@@ -352,6 +352,19 @@
            (insert-slack-token! ds)))
     (timbre/error "OAuth state parameter didn't match!")))
 
+(defn migrated?
+  [table]
+  (-> (sql/query ds
+                 [(str "select * from information_schema.tables "
+                       "where table_name='" table "'")])
+      count pos?))
+
+(defn get-webhook-vars
+  [slack-team-id]
+  (sql/query ds
+             [(str "select webhook_channel, webhook_url"
+                   "from connected_teams where team_id = '" slack-team-id "'")]))
+
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
@@ -364,12 +377,18 @@
   (POST "/which-flight" req
     (let [request-id (utils/uuid)
           request (:params req)
+          webhook-vars (get-webhook-vars (:team_id request))
+          webhook-channel (:webhook_channel webhook-vars)
+          webhook-url (:webhook_url webhook-vars)
+          channel (:channel_name request)
           user-id (:user_id request)
           airport (->> (:command request)
                        (re-find #"[a-z]+")
                        keyword)
           command-text (:text request)
-          response-url (:response_url request)]
+          response-url (if (= channel webhook-channel)
+                           webhook-url
+                           (:response_url request))]
       (timbre/info (str "Slack user " user-id
                         " is requesting info. Checking for flights at "
                         airport "..."))
