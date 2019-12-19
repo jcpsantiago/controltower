@@ -326,15 +326,13 @@
                              :incoming_webhook)
         webhook_url (:url incoming-webhook)
         webhook_channel (:channel incoming-webhook)]
-    body)
-  (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
-                                            :team_name (:team_name access-token-response)
-                                            :registering_user (:user_id access-token-response)
-                                            :scope (:scope access-token-response)
-                                            :access_token (:access_token access-token-response)
-                                            :webhook_url webhook-url
-                                            :webhook_channel webhook-channel})
-
+    (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
+                                              :team_name (:team_name access-token-response)
+                                              :registering_user (:user_id access-token-response)
+                                              :scope (:scope access-token-response)
+                                              :access_token (:access_token access-token-response)
+                                              :webhook_url webhook-url
+                                              :webhook_channel webhook-channel}))
   (timbre/info (str "Done! Team " (:team_name access-token-response)
                     " is connected!")))
 
