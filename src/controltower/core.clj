@@ -5,73 +5,26 @@
    [clojure.string :refer [upper-case]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
+   [controltower.db :as db]
    [controltower.landingpage :as landingpage]
    [controltower.utils :as utils]
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
    [taoensso.timbre :as timbre]
-   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql])
   (:gen-class))
 
+;; ---- Environmental variables --- ;;
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
 (def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
 (def airplane-angles (range 0 372 12))
-(def postgresql-host (let [heroku-url (System/getenv "DATABASE_URL")]
-                       (if (nil? heroku-url)
-                         {:host "0.0.0.0"
-                          :user "postgres"
-                          :dbtype "postgresql"}
-                         (utils/create-map-from-uri heroku-url))))
 (def slack-client-id (System/getenv "CONTROL_TOWER_CLIENT_ID"))
 (def slack-client-secret (System/getenv "CONTROL_TOWER_CLIENT_SECRET"))
 (def slack-oauth-url-state (System/getenv "CONTROL_TOWER_SLACK_OAUTH_STATE"))
-
-(def db postgresql-host)
-(def ds (jdbc/get-datasource db))
-
-(defn migrated?
-  [table]
-  (-> (sql/query ds
-                 [(str "select * from information_schema.tables "
-                       "where table_name='" table "'")])
-      count pos?))
-
-(defn migrate []
-  (when (not (migrated? "requests"))
-    (timbre/info "Creating requests table...")
-    (jdbc/execute! ds ["
-      create table requests (
-        id varchar(255) primary key,
-        user_id varchar(255),
-        team_id varchar(255),
-        channel_id varchar(255),
-        channel_name varchar(255),
-        team_domain varchar(255),
-        airport varchar(255),
-        direction varchar(255),
-        is_retry int,
-        created_at timestamp default current_timestamp
-      )"]))
-  (when (not (migrated? "connected_teams"))
-    (timbre/info "Creating connected_teams table...")
-    (jdbc/execute! ds ["
-        create table connected_teams (
-          id serial primary key,
-          slack_team_id varchar(255),
-          team_name varchar(255),
-          registering_user varchar (255),
-          scope varchar(255),
-          access_token varchar(255),
-          webhook_channel varchar(255),
-          webhook_url varchar(255),
-          created_at timestamp default current_timestamp
-        )"]))
-  (timbre/info "Database ready!"))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
@@ -90,6 +43,15 @@
   (-> boxes
       airport
       flight-direction))
+
+(defn get-webhook-vars!
+  [slack-team-id]
+  (-> (sql/query db/ds
+                 [(str "select webhook_channel_id, webhook_url, webhook_channel "
+                       "from connected_teams where slack_team_id = '"
+                       slack-team-id "'")]
+                 {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
+      first))
 
 (defn iata->city
   "Converts a IATA code to the city name"
@@ -284,21 +246,6 @@
                          :action_id "txl-west"}]}]})
 
 ;; routes and handlers
-(defn simple-body-page
-  "Simple page for healthchecks"
-  [req]
-  {:status  200
-   :headers {"Content-Type" "text/html"}
-   :body    "Yep, it's one of those empty pages..."})
-
-(defn get-webhook-vars
-  [slack-team-id]
-  (-> (sql/query ds
-                 [(str "select webhook_channel_id, webhook_url, webhook_channel "
-                       "from connected_teams where slack_team_id = '"
-                       slack-team-id "'")]
-                 {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
-      first))
 
 (defn which-flight
   "Return the current flight"
@@ -311,7 +258,7 @@
                                 first
                                 keyword)
           team-id (:team_id request)
-          webhook-vars (get-webhook-vars (:team_id request))
+          webhook-vars (get-webhook-vars! (:team_id request))
           webhook-channel-id (:webhook_channel_id webhook-vars)
           webhook-url (:webhook_url webhook-vars)
           channel-id (:channel_id request)
@@ -367,15 +314,8 @@
                                      :state slack-oauth-url-state}})
            :body
            (json/parse-string true)
-           (insert-slack-token! ds)))
+           (insert-slack-token! db/ds)))
     (timbre/error "OAuth state parameter didn't match!")))
-
-(defn migrated?
-  [table]
-  (-> (sql/query ds
-                 [(str "select * from information_schema.tables "
-                       "where table_name='" table "'")])
-      count pos?))
 
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
@@ -389,7 +329,6 @@
   (POST "/which-flight" req
     (let [request-id (utils/uuid)
           request (:params req)
-
           user-id (:user_id request)
           airport (->> (:command request)
                        (re-find #"[a-z]+")
@@ -399,15 +338,16 @@
                         " is requesting info. Checking for flights at "
                         airport "..."))
       (timbre/info (str "request_id:" request-id " saving request in database"))
-      (sql/insert! ds :requests {:id request-id :user_id user-id
-                                 :team_domain (:team_domain request)
-                                 :team_id (:team_id request)
-                                 :channel_id (:channel_id request)
-                                 :channel_name (:channel_name request)
-                                 :airport (name airport)
-                                 :direction command-text
-                                 :is_retry 0})
+      (sql/insert! db/ds :requests {:id request-id :user_id user-id
+                                    :team_domain (:team_domain request)
+                                    :team_id (:team_id request)
+                                    :channel_id (:channel_id request)
+                                    :channel_name (:channel_name request)
+                                    :airport (name airport)
+                                    :direction command-text
+                                    :is_retry 0})
       (which-flight user-id airport command-text request)))
+
   (POST "/which-flight-retry" req
     (let [request-id (utils/uuid)
           request (-> req
@@ -419,24 +359,24 @@
           airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
           flight-direction (keyword (:value received-action))
           team-id (:team_id request)
-          webhook-vars (get-webhook-vars (:team_id request))
+          webhook-vars (get-webhook-vars! (:team_id request))
           webhook-channel-id (:webhook_channel_id webhook-vars)
           webhook-url (:webhook_url webhook-vars)
-          channel-id (:channel_id request)
+          channel-id (:id (:channel request))
           response-url (if (= channel-id webhook-channel-id)
                          webhook-url
                          (:response_url request))]
       (timbre/info (str "Slack user " user-id
                         " is retrying. Checking for flights at "
                         airport "..."))
-      (sql/insert! ds :requests {:id request-id :user_id user-id
-                                 :team_domain (:domain (:team request))
-                                 :team_id (:id (:team request))
-                                 :channel_id (:id (:channel request))
-                                 :channel_name (:name (:channel request))
-                                 :airport (name airport)
-                                 :direction (name flight-direction)
-                                 :is_retry 1})
+      (sql/insert! db/ds :requests {:id request-id :user_id user-id
+                                    :team_domain (:domain (:team request))
+                                    :team_id (:id (:team request))
+                                    :channel_id channel-id
+                                    :channel_name (:name (:channel request))
+                                    :airport (name airport)
+                                    :direction (name flight-direction)
+                                    :is_retry 1})
       (thread (post-flight! airport flight-direction response-url))
       {:status 200
        :body "Standby..."}))
@@ -446,7 +386,7 @@
 (defn -main
   "This is our main entry point"
   []
-  (migrate)
+  (db/migrate)
   (server/run-server (wrap-defaults #'app-routes api-defaults) {:port port})
   (timbre/info
    (str "Control Tower is on the lookout at http:/127.0.0.1:" port "/")))
