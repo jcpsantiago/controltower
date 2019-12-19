@@ -324,8 +324,8 @@
   [access-token-response connection]
   (let [incoming-webhook (-> access-token-response
                              :incoming_webhook)
-        webhook_url (:url incoming-webhook)
-        webhook_channel (:channel incoming-webhook)]
+        webhook-url (:url incoming-webhook)
+        webhook-channel (:channel incoming-webhook)]
     (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
                                               :team_name (:team_name access-token-response)
                                               :registering_user (:user_id access-token-response)
