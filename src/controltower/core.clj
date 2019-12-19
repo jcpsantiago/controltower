@@ -362,8 +362,9 @@
 (defn get-webhook-vars
   [slack-team-id]
   (sql/query ds
-             [(str "select webhook_channel, webhook_url"
-                   "from connected_teams where team_id = '" slack-team-id "'")]))
+             [(str "select webhook_channel, webhook_url "
+                   "from connected_teams where slack_team_id = '"
+                   slack-team-id "'")]))
 
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
