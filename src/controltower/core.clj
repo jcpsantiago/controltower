@@ -67,6 +67,7 @@
           registering_user varchar (255),
           scope varchar(255),
           access_token varchar(255),
+          webhook_url varchar(255),
           created_at timestamp default current_timestamp
         )"]))
   (timbre/info "Database ready!"))
@@ -321,11 +322,18 @@
 
 (defn insert-slack-token!
   [access-token-response connection]
+  (let [incoming-webhook (-> access-token-response
+                             :incoming_webhook)
+        webhook_url (:url incoming-webhook)
+        webhook_channel (:channel incoming-webhook)]
+    body)
   (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
                                             :team_name (:team_name access-token-response)
                                             :registering_user (:user_id access-token-response)
                                             :scope (:scope access-token-response)
-                                            :access_token (:access_token access-token-response)})
+                                            :access_token (:access_token access-token-response)
+                                            :webhook_url webhook-url
+                                            :webhook_channel webhook-channel})
 
   (timbre/info (str "Done! Team " (:team_name access-token-response)
                     " is connected!")))
@@ -349,7 +357,8 @@
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
-       (let [request (:params req)]
+       (let [request-id (utils/uuid)
+             request (:params req)]
          (timbre/info "Received OAuth approval from Slack!")
          (thread (slack-access-token! request))
          (landingpage/homepage)))

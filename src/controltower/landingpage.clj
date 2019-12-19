@@ -8,7 +8,7 @@
 
 (def add-slack-btn
   [:a {:class "f6 link pl2 pr3 pv2 mv2 dib black ba br3 b--near-white bg-white"
-       :href (str "https://slack.com/oauth/authorize?scope=commands&client_id=817564915318.803887856067&state="
+       :href (str "https://slack.com/oauth/authorize?scope=incoming-webhook,commands&client_id=817564915318.803887856067&state="
                   slack-oauth-url-state)}
    [:img {:src "/img/Slack_Mark_Web.svg" :class "pr2 v-mid"
           :height 20 :width 20}]
