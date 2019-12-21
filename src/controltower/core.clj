@@ -61,6 +61,14 @@
        first
        :municipality))
 
+(defn iata->coords
+  "Converts a IATA code to the coordinates of the airport"
+  [iata]
+  (-> (->> (first all-airports)
+           (filter #(= (:iata_code %) iata))
+           first)
+      (select-keys [:latitude_deg :longitude_deg])))
+
 (defn post-to-slack!
   "Post message to Slack"
   [payload url]
@@ -162,13 +170,17 @@
 
 (defn create-mapbox-str
   "Creates mapbox string for image with map and airplane"
-  [image-url longitude latitude night-mode]
+  [image-url longitude latitude night-mode only-airport]
   (str "https://api.mapbox.com/styles/v1/mapbox/"
-       (if night-mode "dark-v10" "streets-v11")
-       "/static/" "url-" image-url
-       "(" longitude "," latitude ")/"
+       (if night-mode "dark-v10" "outdoor-v11")
+       "/static/"
+       (if (nil? image-url)
+         ""
+         (str "url-" image-url
+              "(" longitude "," latitude ")/"))
        longitude "," latitude
-       ",14,0,0/200x200?attribution=false&logo=false&access_token="
+       "," (if only-airport 10 14)
+       ",0,0/200x200?attribution=false&logo=false&access_token="
        mapbox-api-key))
 
 (defn create-payload
@@ -201,7 +213,8 @@
                    :image_url (create-mapbox-str plane-url
                                                  longitude
                                                  latitude
-                                                 night-mode)
+                                                 night-mode
+                                                 false)
                    :alt_text "flight overview"}]}))))
 
 (defn get-flight!
@@ -224,26 +237,43 @@
 
 (defn request-flight-direction
   [airport user-id]
-  {:status 200
-   :blocks [{:type "section"
-             :text {:type "mrkdwn"
-                    :text (str "This is `" (name airport)
-                               "` to user " user-id
-                               " say again!")}}
-            {:type "actions"
-             ;;FIXME should automatically get this from bouncing-boxes
-             :elements [{:type "button"
-                         :text {:type "plain_text"
-                                :text "East"
-                                :emoji false}
-                         :value "e"
-                         :action_id "txl-east"}
-                        {:type "button",
-                         :text {:type "plain_text"
-                                :text "West"
-                                :emoji false},
-                         :value "w"
-                         :action_id "txl-west"}]}]})
+  (let [airport-iata (upper-case (name airport))
+        airport-coords  (iata->coords airport-iata)
+        longitude (:longitude_deg airport-coords)
+        latitude (:latitude_deg airport-coords)
+        city (iata->city airport-iata)
+        weather-response (get-weather! city)
+        night-mode (utils/night? weather-response)]
+    {:status 200
+     :blocks [{:type "section"
+               :text {:type "mrkdwn"
+                      :text (str "This is `" airport-iata
+                                 "` to user " user-id
+                                 " say again!")}}
+              {:type "image"
+               :title {:type "plain_text"
+                       :text airport-iata
+                       :emoji true}
+               :image_url (create-mapbox-str nil
+                                             longitude
+                                             latitude
+                                             night-mode
+                                             true)
+               :alt_text "flight overview"}
+              {:type "actions"
+               ;;FIXME should automatically get this from bouncing-boxes
+               :elements [{:type "button"
+                           :text {:type "plain_text"
+                                  :text "East"
+                                  :emoji false}
+                           :value "e"
+                           :action_id "txl-east"}
+                          {:type "button",
+                           :text {:type "plain_text"
+                                  :text "West"
+                                  :emoji false},
+                           :value "w"
+                           :action_id "txl-west"}]}]}))
 
 ;; routes and handlers
 
