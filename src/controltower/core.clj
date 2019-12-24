@@ -2,7 +2,7 @@
   (:require
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
-   [clojure.string :refer [upper-case]]
+   [clojure.string :refer [lower-case upper-case]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
    [controltower.db :as db]
@@ -12,7 +12,8 @@
    [org.httpkit.client :as http]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
    [taoensso.timbre :as timbre]
-   [next.jdbc.sql :as sql])
+   [next.jdbc.sql :as sql]
+   [next.jdbc.result-set :as sql-builders])
   (:gen-class))
 
 ;; ---- Environmental variables --- ;;
@@ -39,10 +40,9 @@
          :w "52.300794,52.373924,13.2937,13.463721"}})
 
 (defn get-bounding-box
-  [boxes airport flight-direction]
+  [boxes airport]
   (-> boxes
-      airport
-      flight-direction))
+      airport))
 
 (defn get-webhook-vars!
   [slack-team-id]
@@ -50,7 +50,7 @@
                  [(str "select webhook_channel_id, webhook_url, webhook_channel "
                        "from connected_teams where slack_team_id = '"
                        slack-team-id "'")]
-                 {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
+                 {:builder-fn sql-builders/as-unqualified-lower-maps})
       first))
 
 (defn iata->city
@@ -228,22 +228,43 @@
       first-flight
       extract-flight))
 
+(defn flight!
+  [airport coordinates]
+  (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
+  (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
+           coordinates)
+      get-api-data!
+      remove-crud
+      filter-landed
+      first-flight
+      extract-flight))
+
+(defn visible-flight
+  [airport direction]
+  (println "DIRECTION: " direction)
+  (let [coordinates  (vals (get-bounding-box bounding-boxes airport))
+        airport-iata (upper-case (name airport))]
+    (->> (pmap #(flight! airport-iata %) coordinates)
+         doall
+         (filter (comp #{airport-iata} direction))
+         first)))
+
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
-  (-> (get-flight! airport flight-direction)
+  (-> (visible-flight airport flight-direction)
       (create-payload airport)
       (post-to-slack! response-url)))
 
 (defn request-flight-direction
   [airport user-id]
-  (let [airport-iata (upper-case (name airport))
-        airport-coords  (iata->coords airport-iata)
-        longitude (:longitude_deg airport-coords)
-        latitude (:latitude_deg airport-coords)
-        city (iata->city airport-iata)
+  (let [airport-iata     (upper-case (name airport))
+        airport-coords   (iata->coords airport-iata)
+        longitude        (:longitude_deg airport-coords)
+        latitude         (:latitude_deg airport-coords)
+        city             (iata->city airport-iata)
         weather-response (get-weather! city)
-        night-mode (utils/night? weather-response)]
+        night-mode       (utils/night? weather-response)]
     {:status 200
      :blocks [{:type "section"
                :text {:type "mrkdwn"
@@ -279,15 +300,9 @@
 
 (defn which-flight
   "Return the current flight"
-  [user-id airport command-text request]
-  (if (and (contains? bounding-boxes airport)
-           (seq command-text))
-    (let [flight-direction (->> command-text
-                                ;;FIXME should be dynamic for more directions
-                                (re-matches #"(?i)(^e{1}$)|(^w{1}$)")
-                                first
-                                keyword)
-          team-id (:team_id request)
+  [user-id airport flight-direction request]
+  (if (contains? bounding-boxes airport)
+    (let [team-id (:team_id request)
           webhook-vars (get-webhook-vars! (:team_id request))
           webhook-channel-id (:webhook_channel_id webhook-vars)
           webhook-url (:webhook_url webhook-vars)
@@ -295,18 +310,11 @@
           response-url (if (= channel-id webhook-channel-id)
                          webhook-url
                          (:response_url request))]
-      (if (nil? flight-direction)
-        (do
-          (timbre/error "Invalid flight direction!")
-          (thread (post-to-slack! (request-flight-direction airport user-id)
-                                  (:response_url request)))
-          {:status 200
-           :body ""})
-        (do
-          (thread (post-flight! airport flight-direction response-url))
-          (timbre/info "Replying immediately to slack")
-          {:status 200
-           :body (str "User " user-id " standby...")})))
+      (thread (post-flight! airport flight-direction response-url))
+      (timbre/info "Replying immediately to slack")
+      {:status 200
+       :body (str "User " user-id " standby...")})
+
     (do
       ;;NOTE the slash command is already set on slack
       (timbre/error "Flight direction is missing! Asking for more info...")
@@ -360,13 +368,17 @@
     (let [request-id (utils/uuid)
           request (:params req)
           user-id (:user_id request)
-          airport (->> (:command request)
+          command (->> (:command request)
                        (re-find #"[a-z]+")
                        keyword)
-          command-text (:text request)]
+          flight-direction (command->direction command)
+          airport (-> (:text request)
+                      lower-case
+                      keyword)]
       (timbre/info (str "Slack user " user-id
                         " is requesting info. Checking for flights at "
                         airport "..."))
+      (if (contains? bounding-boxes airport))
       (timbre/info (str "request_id:" request-id " saving request in database"))
       (sql/insert! db/ds :requests {:id request-id :user_id user-id
                                     :team_domain (:team_domain request)
@@ -374,9 +386,9 @@
                                     :channel_id (:channel_id request)
                                     :channel_name (:channel_name request)
                                     :airport (name airport)
-                                    :direction command-text
+                                    :direction (name flight-direction)
                                     :is_retry 0})
-      (which-flight user-id airport command-text request)))
+      (which-flight user-id airport flight-direction request)))
 
   (POST "/which-flight-retry" req
     (let [request-id (utils/uuid)
