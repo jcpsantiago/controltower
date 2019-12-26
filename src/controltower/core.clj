@@ -167,13 +167,13 @@
 
 (defn create-flight-str
   "Creates a string with information about the flight"
-  [flight]
+  [flight airport]
   (let [gmaps-response (-> (create-gmaps-str (:lat flight) (:lon flight))
                            get-api-data!
                            :results
                            first)
         address (:formatted_address gmaps-response)]
-    (str "Flight " (:flight flight)
+    (str "`" (upper-case (name airport)) "` tower sees flight " (:flight flight)
          " (" (:aircraft flight) ") "
          (if (and (empty? (:start flight))
                   (empty? (:end flight)))
@@ -217,8 +217,8 @@
                            (apply int plane-angle) ".png")]
         (timbre/info (str "Creating payload for " flight))
         {:blocks [{:type "section"
-                   :text {:type "plain_text"
-                          :text (create-flight-str flight)}}
+                   :text {:type "mrkdwn"
+                          :text (create-flight-str flight airport)}}
                   {:type "image"
                    :title {:type "plain_text"
                            :text (or (:flight flight) "Flight location")
