@@ -23,3 +23,4 @@
   :uberjar-name "controltower.jar"
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
+  ;:global-vars {*warn-on-reflection* true})

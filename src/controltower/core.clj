@@ -30,7 +30,24 @@
 ;; list of airports from https://datahub.io/core/airport-codes#data
 ;; under Public Domain Dedication and License
 ;; encoding is problematic, so I rolled my own json from the csv file
-(def all-airports (utils/parse-json "resources/airport-codes_json.json"))
+(def all-airports 
+  (with-open [r (java.io.PushbackReader.
+                 (clojure.java.io/reader "resources/airports_with_boxes.edn"))]
+    (binding [*read-eval* false]
+      (read r))))
+
+(def directions-mapping
+  {:dep "start"
+   :arr "finish"})
+
+(defn command->direction
+  "Convert slack commands into flight directions"
+  [command]
+  (let [direction (command directions-mapping)]
+    (if (nil? direction)
+      {}
+      (keyword direction))))
+
 
 ;; from https://boundingbox.klokantech.com
 (def bounding-boxes
@@ -41,8 +58,8 @@
 
 (defn get-bounding-box
   [boxes airport]
-  (-> boxes
-      airport))
+  (get-in boxes [airport :boundingbox]))
+
 
 (defn get-webhook-vars!
   [slack-team-id]
@@ -56,10 +73,7 @@
 (defn iata->city
   "Converts a IATA code to the city name"
   [iata]
-  (->> (first all-airports)
-       (filter #(= (:iata_code %) iata))
-       first
-       :municipality))
+  (get-in all-airports [iata :municipality]))
 
 (defn iata->coords
   "Converts a IATA code to the coordinates of the airport"
@@ -89,7 +103,8 @@
   "Get current weather condition for a city"
   [city]
   (timbre/info "Checking the weather...")
-  (-> (str "http://api.openweathermap.org/data/2.5/weather?q=" city
+  (-> (str "http://api.openweathermap.org/data/2.5/weather?q="
+           (java.net.URLEncoder/encode city)
            "&appid=" openweather-api-key)
       get-api-data!))
 
@@ -163,8 +178,8 @@
          (if (and (empty? (:start flight))
                   (empty? (:end flight)))
            "with unknown destination"
-           (str "from " (iata->city (:start flight)) " (" (:start flight) ")"
-                " to " (iata->city (:end flight)) " (" (:end flight) ")"))
+           (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
+                " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")"))
          " currently moving at " (:speed flight) " km/h over " address
          " at an altitude of " (:altitude flight) " meters.")))
 
@@ -172,7 +187,7 @@
   "Creates mapbox string for image with map and airplane"
   [image-url longitude latitude night-mode only-airport]
   (str "https://api.mapbox.com/styles/v1/mapbox/"
-       (if night-mode "dark-v10" "outdoor-v11")
+       (if night-mode "dark-v10" "outdoors-v11")
        "/static/"
        (if (nil? image-url)
          ""
@@ -186,12 +201,10 @@
 (defn create-payload
   "Create a map to be converted into JSON for POST"
   [flight airport]
+  (println flight)
   (let [latitude (:lat flight)
         longitude (:lon flight)
-        city (-> airport
-                 name
-                 upper-case
-                 iata->city)
+        city (iata->city airport)
         weather-response (get-weather! city)]
     (if (empty? flight)
       (let [weather-description (get-weather-description weather-response)]
@@ -221,7 +234,7 @@
   "Calls flightradar24 cleans the data and extracts the first flight"
   [airport flight-direction]
   (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
-           (get-bounding-box bounding-boxes airport flight-direction))
+           (get-bounding-box all-airports airport))
       get-api-data!
       remove-crud
       filter-landed
@@ -229,30 +242,36 @@
       extract-flight))
 
 (defn flight!
-  [airport coordinates]
-  (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
-  (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
-           coordinates)
-      get-api-data!
-      remove-crud
-      filter-landed
-      first-flight
-      extract-flight))
+  [airport]
+  (let [coordinates (get-bounding-box all-airports airport)]
+    (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
+    (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
+             coordinates)
+        get-api-data!
+        remove-crud
+        filter-landed
+        first-flight
+        extract-flight)))
 
 (defn visible-flight
-  [airport direction]
-  (println "DIRECTION: " direction)
-  (let [coordinates  (vals (get-bounding-box bounding-boxes airport))
+  [airport]
+  (let [coordinates (get-bounding-box all-airports airport)
         airport-iata (upper-case (name airport))]
     (->> (pmap #(flight! airport-iata %) coordinates)
          doall
-         (filter (comp #{airport-iata} direction))
          first)))
 
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
   (-> (visible-flight airport flight-direction)
+      (create-payload airport)
+      (post-to-slack! response-url)))
+
+(defn post-all-airports-flight!
+  "Gets flight, create string and post it to Slack"
+  [airport response-url]
+  (-> (flight! airport)
       (create-payload airport)
       (post-to-slack! response-url)))
 
@@ -323,6 +342,23 @@
       {:status 200
        :body ""})))
 
+(defn which-flight-allairports
+  "Return the current flight"
+  [user-id airport request]
+  (let [team-id (:team_id request)
+        webhook-vars (get-webhook-vars! team-id)
+        webhook-channel-id (:webhook_channel_id webhook-vars)
+        webhook-url (:webhook_url webhook-vars)
+        channel-id (:channel_id request)
+        response-url (if (= channel-id webhook-channel-id)
+                       webhook-url
+                       (:response_url request))]
+    (timbre/info "Starting to post flight" )
+    (thread (post-all-airports-flight! airport response-url))
+    (timbre/info "Replying immediately to slack")
+    {:status 200
+     :body (str "User " user-id " standby...")}))
+
 (defn insert-slack-token!
   [access-token-response connection]
   (let [incoming-webhook (-> access-token-response
@@ -358,11 +394,11 @@
 (defroutes app-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
-       (let [request-id (utils/uuid)
-             request (:params req)]
-         (timbre/info "Received OAuth approval from Slack!")
-         (thread (slack-access-token! request))
-         (landingpage/homepage)))
+    (let [request-id (utils/uuid)
+          request (:params req)]
+      (timbre/info "Received OAuth approval from Slack!")
+      (thread (slack-access-token! request))
+      (landingpage/homepage)))
 
   (POST "/which-flight" req
     (let [request-id (utils/uuid)
@@ -378,7 +414,6 @@
       (timbre/info (str "Slack user " user-id
                         " is requesting info. Checking for flights at "
                         airport "..."))
-      (if (contains? bounding-boxes airport))
       (timbre/info (str "request_id:" request-id " saving request in database"))
       (sql/insert! db/ds :requests {:id request-id :user_id user-id
                                     :team_domain (:team_domain request)
@@ -389,6 +424,30 @@
                                     :direction (name flight-direction)
                                     :is_retry 0})
       (which-flight user-id airport flight-direction request)))
+  
+    (POST "/spot-flight" req
+      (let [request-id (utils/uuid)
+            request (:params req)
+            user-id (:user_id request)
+            command (->> (:command request)
+                         (re-find #"[a-z]+")
+                         keyword)
+            airport (-> (:text request)
+                        lower-case
+                        keyword)]
+        (timbre/info (str "Slack user " user-id
+                          " is requesting info. Checking for flights at "
+                          airport "..."))
+        (timbre/info (str "request_id:" request-id " saving request in database"))
+        (sql/insert! db/ds :requests {:id request-id :user_id user-id
+                                      :team_domain (:team_domain request)
+                                      :team_id (:team_id request)
+                                      :channel_id (:channel_id request)
+                                      :channel_name (:channel_name request)
+                                      :airport (name airport)
+                                      :direction "NO DIRECTION"
+                                      :is_retry 0})
+        (which-flight-allairports user-id airport request)))
 
   (POST "/which-flight-retry" req
     (let [request-id (utils/uuid)
@@ -406,8 +465,8 @@
           webhook-url (:webhook_url webhook-vars)
           channel-id (:id (:channel request))
           response-url (if (= channel-id webhook-channel-id)
-                           webhook-url
-                           (:response_url request))]
+                         webhook-url
+                         (:response_url request))]
       (timbre/info (str "Slack user " user-id
                         " is retrying. Checking for flights at "
                         airport "..."))
