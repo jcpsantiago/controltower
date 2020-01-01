@@ -490,7 +490,7 @@
                                             :direction "NO DIRECTION"
                                             :is_retry 0})
               (which-flight-allairports user-id req-text request))
-            (if (seq (string->airportkeys :municipality (name req-text)))
+            (if (seq (string->airportkeys :name (name req-text)))
               (do
                 (timbre/info (str "Slack user " user-id
                                   " is checking for airports at "
