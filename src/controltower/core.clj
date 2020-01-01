@@ -46,7 +46,7 @@
 (defn string->airportname
   [variable str]
   (let [ks (into [] (string->airportkeys variable str))
-        names (into [] (map #(get-in all-airports [% variable]) ks))
+        names (into [] (map #(get-in all-airports [% :name]) ks))
         clean-names (map #(clojure.string/replace % #"\s[A|a]irport" "") names)]
     (zipmap ks clean-names)))
 
@@ -466,8 +466,8 @@
           user-id (:user_id request)
           user-name (:user_name request)
           req-text (-> (:text request)
-                      lower-case
-                      keyword)]
+                       lower-case
+                       keyword)]
       (if (= req-text :random)
         (let [random-airport (rand-nth (keys all-airports))]
           (timbre/info (str "Slack user " user-id " (" user-name ")"
@@ -490,7 +490,7 @@
                                             :direction "NO DIRECTION"
                                             :is_retry 0})
               (which-flight-allairports user-id req-text request))
-            (if (seq (string->airportkeys :name (name req-text)))
+            (if (seq (string->airportkeys :municipality (name req-text)))
               (do
                 (timbre/info (str "Slack user " user-id
                                   " is checking for airports at "
