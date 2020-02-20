@@ -12,7 +12,7 @@
                  [org.clojure/data.json "0.2.7"]
                  [org.postgresql/postgresql "42.2.9"]
                  [hiccup "1.0.5"]
-                 [http-kit "2.4.0-alpha3"]
+                 [http-kit "2.4.0-alpha6"]
                  [mock-clj "0.2.1"]
                  [proto-repl "0.3.1"]
                  [ring/ring-defaults "0.3.2"]

@@ -13,11 +13,14 @@
    [controltower.utils :as utils]
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
+   [org.httpkit.sni-client :as sni-client]
    [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
    [taoensso.timbre :as timbre]
    [next.jdbc.sql :as sql]
    [next.jdbc.result-set :as sql-builders])
   (:gen-class))
+
+(alter-var-root #'org.httpkit.client/*default-client* (fn [_] sni-client/default-client))
 
 ;; ---- Environmental variables --- ;;
 (def maps-api-key (System/getenv "GOOGLE_MAPS_API_KEY"))
@@ -40,8 +43,8 @@
 
 (defn string->airportkeys
   [variable str]
-  (keep (fn [[k v]] (if (= (lower-case (variable v))
-                           (lower-case str)) k)) all-airports))
+  (keep (fn [[k v]] (when (= (lower-case (variable v))
+                             (lower-case str)) k)) all-airports))
 
 (defn string->airportname
   [variable str]
@@ -165,11 +168,11 @@
 (defn onair-flights
   [flight-data]
   (let [ks (into [] (keep (fn [[k v]]
-                            (if (and (= (:onground v) 0)
-                                     (> (:altitude v) 150)
-                                     (seq (:start v))
-                                     (seq (:end v))
-                                     (seq (:flight v)))
+                            (when (and (= (:onground v) 0)
+                                       (> (:altitude v) 150)
+                                       (seq (:start v))
+                                       (seq (:end v))
+                                       (seq (:flight v)))
                                 k)) flight-data))]
     (if (empty? ks)
       (do
@@ -420,8 +423,8 @@
         webhook-url (:webhook_url webhook-vars)
         channel-id (:channel_id request)
         response-url (if (= channel-id webhook-channel-id)
-                       webhook-url
-                       (:response_url request))]
+                         webhook-url
+                         (:response_url request))]
     (timbre/info "Starting to post flight")
     (thread (post-all-airports-flight! airport response-url))
     (timbre/info "Replying immediately to slack")
