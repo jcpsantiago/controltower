@@ -4,7 +4,7 @@
    [buddy.core.mac :as mac]
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
-   [clojure.string :refer [lower-case upper-case]]
+   [clojure.string :refer [split lower-case upper-case]]
    [clojure.walk :refer [keywordize-keys]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
@@ -43,8 +43,8 @@
 
 (defn string->airportkeys
   [variable str]
-  (keep (fn [[k v]] (when (= (lower-case (variable v))
-                             (lower-case str)) k)) all-airports))
+  (keep (fn [[k v]] (when (= (lower-case (variable v)))
+                       (lower-case str)) k)) all-airports)
 
 (defn string->airportname
   [variable str]
@@ -179,8 +179,29 @@
         (timbre/info "No flights in the air, returning empty map.")
         {})
       (do
-        (timbre/info "Returning flights found in the air" ks)
+        (timbre/info "Returning" (count ks) "flights found in the air")
         (select-keys flight-data ks)))))
+
+(def direction->positions
+  {:arr :end
+   :dep :start})
+
+(defn filter-direction
+  [flight-data airport direction]
+  (when (empty? flight-data)
+    (timbre/info "No flights to filter, returning empty map.")
+    {})
+  (timbre/info "Filtering for flights in direction" (name direction))
+  (if (= direction :any)
+    (do
+      (timbre/info "Skipping filtering direction and selecting a random flight")
+      flight-data)
+    (let [position (direction direction->positions)
+          ks (into [] (keep (fn [[k v]]
+                              (when (= (lower-case (position v)) (name airport))
+                                k)) flight-data))]
+      (timbre/info "Returning" (count ks) "flights.")
+      (select-keys flight-data ks))))
 
 (defn random-flight
   [flight-data]
@@ -275,8 +296,7 @@
 (defn create-payload
   "Create a map to be converted into JSON for POST"
   [flight airport]
-  (let [city (iata->city airport)
-        airport-coords (iata->coords airport)
+  (let [airport-coords (iata->coords airport)
         longitude (:longitude_deg airport-coords)
         latitude (:latitude_deg airport-coords)
         airport-name (iata->name airport)
@@ -328,7 +348,7 @@
                    :alt_text "flight overview"}]}))))
 
 (defn flight!
-  [airport]
+  [airport direction]
   (let [coordinates (get-bounding-box all-airports airport)]
     (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
     (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
@@ -337,6 +357,7 @@
         remove-crud
         f24-with-keywords
         onair-flights
+        (filter-direction airport direction)
         random-flight
         metric-system-vals)))
 
@@ -351,56 +372,16 @@
 (defn post-flight!
   "Gets flight, create string and post it to Slack"
   [airport flight-direction response-url]
-  (-> (visible-flight airport flight-direction)
+  (-> (visible-flight airport)
       (create-payload airport)
       (post-to-slack! response-url)))
 
 (defn post-all-airports-flight!
   "Gets flight, create string and post it to Slack"
-  [airport response-url]
-  (-> (flight! airport)
+  [airport direction response-url]
+  (-> (flight! airport direction)
       (create-payload airport)
       (post-to-slack! response-url)))
-
-(defn request-flight-direction
-  [airport user-id]
-  (let [airport-iata     (upper-case (name airport))
-        airport-coords   (iata->coords airport-iata)
-        longitude        (:longitude_deg airport-coords)
-        latitude         (:latitude_deg airport-coords)
-        city             (iata->city airport-iata)
-        weather-response (get-weather! city)
-        night-mode       (utils/night? weather-response)]
-    {:status 200
-     :blocks [{:type "section"
-               :text {:type "mrkdwn"
-                      :text (str "This is `" airport-iata
-                                 "` to user " user-id
-                                 " say again!")}}
-              {:type "image"
-               :title {:type "plain_text"
-                       :text airport-iata
-                       :emoji true}
-               :image_url (create-mapbox-str nil
-                                             longitude
-                                             latitude
-                                             night-mode
-                                             true)
-               :alt_text "flight overview"}
-              {:type "actions"
-               ;;FIXME should automatically get this from bouncing-boxes
-               :elements [{:type "button"
-                           :text {:type "plain_text"
-                                  :text "East"
-                                  :emoji false}
-                           :value "e"
-                           :action_id "txl-east"}
-                          {:type "button",
-                           :text {:type "plain_text"
-                                  :text "West"
-                                  :emoji false},
-                           :value "w"
-                           :action_id "txl-west"}]}]}))
 
 (defn request-airport-iata
   [city user-id]
@@ -416,7 +397,7 @@
 ;; routes and handlers
 (defn which-flight-allairports
   "Return the current flight"
-  [user-id airport request]
+  [user-id airport direction request]
   (let [team-id (:team_id request)
         webhook-vars (get-webhook-vars! team-id)
         webhook-channel-id (:webhook_channel_id webhook-vars)
@@ -426,7 +407,7 @@
                          webhook-url
                          (:response_url request))]
     (timbre/info "Starting to post flight")
-    (thread (post-all-airports-flight! airport response-url))
+    (thread (post-all-airports-flight! airport direction response-url))
     (timbre/info "Replying immediately to slack")
     {:status 200
      :body (str "User " user-id " standby...")}))
@@ -462,50 +443,60 @@
            (insert-slack-token! db/ds)))
     (timbre/error "OAuth state parameter didn't match!")))
 
+(defn prepare-req-text
+  "Middleware that splits the req-text into [direction] and [airport]."
+  [handler]
+  (fn
+    [request]
+    (if (= :post (:request-method request))
+      (let [raw-req-text (:text (:params request))
+            splits (-> raw-req-text
+                       (split #"\W"))
+            direction-k (->> splits
+                            first
+                            lower-case
+                            (re-find #"^arr|^dep|^any")
+                            keyword)
+            airport-k (-> splits
+                          last
+                          lower-case
+
 (defroutes api-routes
   (POST "/spot-flight" req
     (let [request-id (utils/uuid)
           request (:params req)
           user-id (:user_id request)
           user-name (:user_name request)
-          req-text (-> (:text request)
-                       lower-case
-                       keyword)]
-      (if (= req-text :random)
-        (let [random-airport (rand-nth (keys all-airports))]
-          (timbre/info (str "Slack user " user-id " (" user-name ")"
-                            " is requesting info about a random airport. "
-                            "Checking for flights at " random-airport "..."))
-          (which-flight-allairports user-id random-airport request))
-        (do
-          (timbre/info (str "Slack user " user-id
-                            " is requesting info. Checking for flights at "
-                            req-text "..."))
-          (if (contains? all-airports req-text)
+          airport (:airport req)
+          direction (:direction req)]
+        (timbre/info (str "Slack user " user-id " (" user-name ")"
+                          " is requesting info. Checking for flights at "
+                          (upper-case (name airport)) "..."))
+        (if (contains? all-airports airport)
+          (do
+            (timbre/info (str "request_id:" request-id " saving request in database"))
+            (sql/insert! db/ds :requests {:id request-id :user_id user-id
+                                          :team_domain (:team_domain request)
+                                          :team_id (:team_id request)
+                                          :channel_id (:channel_id request)
+                                          :channel_name (:channel_name request)
+                                          :airport (name airport)
+                                          :direction (name direction)
+                                          :is_retry 0})
+            (which-flight-allairports user-id airport direction request))
+          (if (seq (string->airportkeys :municipality (name airport)))
             (do
-              (timbre/info (str "request_id:" request-id " saving request in database"))
-              (sql/insert! db/ds :requests {:id request-id :user_id user-id
-                                            :team_domain (:team_domain request)
-                                            :team_id (:team_id request)
-                                            :channel_id (:channel_id request)
-                                            :channel_name (:channel_name request)
-                                            :airport (name req-text)
-                                            :direction "NO DIRECTION"
-                                            :is_retry 0})
-              (which-flight-allairports user-id req-text request))
-            (if (seq (string->airportkeys :municipality (name req-text)))
-              (do
-                (timbre/info (str "Slack user " user-id
-                                  " is checking for airports at "
-                                  req-text "..."))
-                (thread (post-to-slack! (request-airport-iata (name req-text) user-id) (:response_url request)))
-                {:status 200
-                 :body ""})
-              (do
-                (timbre/warn req-text " is not known!")
-                {:status 200
-                 :body (str "User " user-id " please say again. ATC does not know "
-                            "`" (name req-text) "`")})))))))
+              (timbre/info (str "Slack user " user-id
+                                " is checking for airports at "
+                                airport "..."))
+              (thread (post-to-slack! (request-airport-iata (name airport) user-id) (:response_url request)))
+              {:status 200
+               :body ""})
+            (do
+              (timbre/warn airport " is not known!")
+              {:status 200
+               :body (str "User " user-id " please say again. ATC does not know "
+                          "`" (name airport) "`")})))))
 
 
   (POST "/which-flight-retry" req
@@ -590,6 +581,7 @@
   [handler]
   (fn
     [request]
+    (timbre/info "Keeping raw json intact...")
     (if (= :post (:request-method request))
       (let [raw-body (slurp (:body request))
             request' (-> request
@@ -603,6 +595,7 @@
 
 (def app
   (-> app-routes
+      prepare-req-text
       verify-slack-request
       (wrap-defaults api-defaults)
       keep-raw-json))
