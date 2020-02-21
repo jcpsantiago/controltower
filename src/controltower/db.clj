@@ -52,6 +52,7 @@
           access_token varchar(255),
           webhook_channel varchar(255),
           webhook_url varchar(255),
+          webhook_channel_id varchar(255),
           created_at timestamp default current_timestamp
         )"]))
   (timbre/info "Database ready!"))

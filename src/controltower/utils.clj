@@ -33,6 +33,14 @@
   (json/parsed-seq (clojure.java.io/reader file)
                    true))
 
+(defn parse-edn
+  "Reads data saved as EDN"
+  [file]
+  (with-open [r (java.io.PushbackReader.
+                 (clojure.java.io/reader file))]
+    (binding [*read-eval* false]
+      (read r))))
+
 (defn log-http-status
   "Log API response"
   [{:keys [status body]} service type]

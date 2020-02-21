@@ -23,10 +23,6 @@
   (json/parsed-seq (io/reader "airport-codes_onlyscheduled.json") true))
 (println "done!")
 
-(defn truncate-number
-  [x]
-  (format "%.2f" x))
-
 (defn maxmin-lonlat
   [airport-info]
   (let [iata (:iata_code airport-info)
@@ -34,14 +30,10 @@
         longitude (edn/read-string (:longitude_deg airport-info))
         latitude-dif (calc-latitude-dif 5500)
         longitude-dif (calc-longitude-dif latitude 5500)
-        lat+ (+ latitude latitude-dif)
-        lat- (- latitude latitude-dif)
-        lon+ (+ longitude longitude-dif)
-        lon- (- longitude longitude-dif)
-        latmax (truncate-number (max lat+ lat-))
-        latmin (truncate-number (min lat+ lat-))
-        lonmax (truncate-number (max lon+ lon-))
-        lonmin (truncate-number (min lon+ lon-))]
+        latmax (+ latitude latitude-dif)
+        lonmax (+ longitude longitude-dif)
+        latmin (- latitude latitude-dif)
+        lonmin (- longitude longitude-dif)]
     {(keyword (str/lower-case iata))
      (conj airport-info [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])}))
 

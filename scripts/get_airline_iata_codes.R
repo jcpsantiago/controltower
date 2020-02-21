@@ -8,7 +8,7 @@ airline_codes_table <- xml2::read_html(webpage_url) %>%
   rvest::html_node(".wikitable") %>% 
   rvest::html_table(fill = TRUE) %>% 
   janitor::clean_names() %>% 
-  filter(iata != "" & airline != "" & comments != "defunct" & icao != "")
+  filter(iata != "" & airline != "" & comments != "defunct")
 
 airline_codes_table %>% 
   jsonlite::write_json("airline_iata_info.json")

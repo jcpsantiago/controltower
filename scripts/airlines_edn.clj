@@ -8,7 +8,7 @@
 (defn airline-icao-map
   [json-map]
   (let [icao (keyword (:icao json-map))]
-    (zipmap [icao] [json-map])))
+    (zipmap icao json-map)))
 
 (println "Generating airline icao info EDN")
 (->> (pmap airline-icao-map (first airlines))
