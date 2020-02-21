@@ -460,6 +460,21 @@
             airport-k (-> splits
                           last
                           lower-case
+                          keyword)
+            airport (if (= airport-k :random)
+                      (rand-nth (keys all-airports))
+                      airport-k)
+            direction (if (or (= airport :random) (nil? direction-k))
+                        :any
+                        direction-k)
+            airport-type (if (= airport-k :random) "random" "user-input")
+            request' (assoc request 
+                            :direction direction 
+                            :airport airport 
+                            :airport-type airport-type)]
+        (handler request'))
+      (handler request))))
+
 
 (defroutes api-routes
   (POST "/spot-flight" req
