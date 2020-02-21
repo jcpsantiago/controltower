@@ -477,6 +477,21 @@
 
 
 (defroutes api-routes
+  ;; There are two elements to a call: /spot [direction] [airport]
+  ;; [direction] is set to "random" by default
+  ;; [airport] always needs input and controltower will request input if it's missing
+  ;; [airport] can be either a IATA code, a city or "random"
+  ;; /spot random -> is implicitly /spot random random
+  ;; ATC response should include the direction too: 
+  ;; "Flight 123 is [arriving/departing]" in case the flight is to/from [airport]
+  ;; otherwise "Flight 123 from [IATA] to [IATA]"
+  ;;
+  ;; 1- split incoming string and only look at the first and last
+  ;; 1.2 - if first = 'random' and last = nil, then random-flight
+  ;; 1.3 - if first in [arr|dep] and last in airports, then flight with direction
+  ;; 1.4 - if none of the above then ask for more information 
+  ;; 2- if failed, then 
+
   (POST "/spot-flight" req
     (let [request-id (utils/uuid)
           request (:params req)
