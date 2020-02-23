@@ -261,7 +261,7 @@
         airport-name (iata->name airport)
         night-mode (utils/night? @weather-response)]
     (if (empty? flight)
-      (let [weather-description (get-weather-description weather-response)]
+      (let [weather-description (get-weather-description @weather-response)]
         {:blocks [{:type "section"
                    :text {:type "mrkdwn"
                           :text (str "<https://www.openstreetmap.org/#map=14/"
@@ -406,6 +406,7 @@
     (if (= :post (:request-method request))
       (let [params (:params request)
             raw-req-text (or (:text params) (retry-value params))
+            ; FIXME: not working for cities with two tokens like Los Angeles
             splits (-> raw-req-text
                        (split #"\W"))
             direction-k (->> splits
