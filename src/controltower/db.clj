@@ -1,6 +1,5 @@
 (ns controltower.db
   (:require
-   [cheshire.core :as json]
    [controltower.utils :as utils]
    [taoensso.timbre :as timbre]
    [next.jdbc :as jdbc]

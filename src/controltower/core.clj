@@ -20,6 +20,7 @@
    [next.jdbc.result-set :as sql-builders])
   (:gen-class))
 
+; Temporary measure until httpkit enables SNI by default
 (alter-var-root #'org.httpkit.client/*default-client* (fn [_] sni-client/default-client))
 
 ;; ---- Environmental variables --- ;;
@@ -42,13 +43,13 @@
 (def airlines-icao (utils/parse-edn "resources/airline_icao_info.edn"))
 
 (defn string->airportkeys
-  [variable str]
-  (keep (fn [[k v]] (when (= (lower-case (variable v)))
-                       (lower-case str)) k)) all-airports)
+  [variable string]
+  (keep (fn [[k v]] (when (= (lower-case (variable v)) 
+                             (lower-case string)) k)) all-airports))
 
 (defn string->airportname
-  [variable str]
-  (let [ks (into [] (string->airportkeys variable str))
+  [variable string]
+  (let [ks (into [] (string->airportkeys variable string))
         names (into [] (map #(get-in all-airports [% :name]) ks))
         clean-names (map #(clojure.string/replace % #"\s[A|a]irport" "") names)]
     (zipmap ks clean-names)))
@@ -74,17 +75,9 @@
       {}
       (keyword direction))))
 
-;; from https://boundingbox.klokantech.com
-(def bounding-boxes
-  {:txl {:e "52.577701,52.558327,13.32212,13.402922"
-         :w "52.561077,52.543694,13.182475,13.249971"}
-   :sxf {:e "52.430207,52.357171,13.534024,13.704046"
-         :w "52.300794,52.373924,13.2937,13.463721"}})
-
 (defn get-bounding-box
   [boxes airport]
   (get-in boxes [airport :boundingbox]))
-
 
 (defn get-webhook-vars!
   [slack-team-id]
@@ -149,7 +142,6 @@
   (str "https://maps.googleapis.com/maps/api/geocode/json?latlng="
        latitude "," longitude "&key=" maps-api-key))
 
-;; extracting info from flightradar24 API and cleaning everying
 (defn remove-crud
   "Remove irrelevant fields from flightradar24"
   [flight-data]
@@ -224,38 +216,6 @@
       (assoc-in flight-data [:altitude] (int (* (:altitude flight-data) 3.281)))
       (assoc-in flight-data [:speed] (int (* (:speed flight-data) 1.852))))))
 
-(defn get-first-plane
-  "Get the keyword for the first plane"
-  [clean-flight-data]
-  (timbre/info "Keeping only first flight in list")
-  (first (keys clean-flight-data)))
-
-(defn first-flight
-  "Get data for the first plane in the list"
-  [clean-flight-data]
-  (if (empty? clean-flight-data)
-    (do
-      (timbre/info "No flights found, returning empty map instead")
-      {})
-    ((get-first-plane clean-flight-data) clean-flight-data)))
-
-(defn extract-flight
-  "Extract the flight information and create a map with appropriate keywords"
-  [clean-flight-data]
-  (if (empty? clean-flight-data)
-    {}
-    (do
-      (timbre/info "Extracting flight information into map")
-      {:flight (nth clean-flight-data 13)
-       :start (nth clean-flight-data 11)
-       :end (nth clean-flight-data 12)
-       :aircraft (nth clean-flight-data 8)
-       :lat (nth clean-flight-data 1)
-       :lon (nth clean-flight-data 2)
-       :altitude (int (/ (nth clean-flight-data 4) 3.281))
-       :speed (int (* (nth clean-flight-data 5) 1.852))
-       :track (nth clean-flight-data 3)})))
-
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight airport-iata airline-name]
@@ -270,11 +230,8 @@
            (str airline-name " "))
          "flight " (:flight flight)
          " (" (:aircraft flight) ") "
-         (if (and (empty? (:start flight))
-                  (empty? (:end flight)))
-           "with unknown destination"
-           (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
-                " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")"))
+         (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
+              " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")")
          " currently moving at " (:speed flight) " km/h over " address
          " at an altitude of " (:altitude flight) " meters.")))
 
@@ -297,18 +254,18 @@
   "Create a map to be converted into JSON for POST"
   [flight airport]
   (let [airport-coords (iata->coords airport)
-        longitude (:longitude_deg airport-coords)
-        latitude (:latitude_deg airport-coords)
+        airport-lon (:longitude_deg airport-coords)
+        airport-lat (:latitude_deg airport-coords)
+        weather-response (future (get-weather! airport-lat airport-lon))
+        airport-iata (upper-case (name airport))
         airport-name (iata->name airport)
-        weather-response (get-weather! latitude longitude)
-        night-mode (utils/night? weather-response)
-        airport-iata (upper-case (name airport))]
+        night-mode (utils/night? @weather-response)]
     (if (empty? flight)
       (let [weather-description (get-weather-description weather-response)]
         {:blocks [{:type "section"
                    :text {:type "mrkdwn"
                           :text (str "<https://www.openstreetmap.org/#map=14/"
-                                     latitude "/" longitude
+                                     airport-lat "/" airport-lon
                                      " | " airport-name ">"
                                      " tower observes " weather-description
                                      ", no air traffic, over.")}}
@@ -317,13 +274,13 @@
                            :text (str airport-iata " airport")
                            :emoji true}
                    :image_url (create-mapbox-str nil
-                                                 longitude
-                                                 latitude
+                                                 airport-lon
+                                                 airport-lat
                                                  night-mode
                                                  true)
                    :alt_text (str airport-iata " airport")}]})
-      (let [latitude (:lat flight)
-            longitude (:lon flight)
+      (let [flight-lon (:lon flight)
+            flight-lat (:lat flight)
             airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
             callsign (keyword (:icao-callsign flight))
             airline-name (get-in airlines-icao [callsign :airline])
@@ -341,8 +298,8 @@
                            :text (or (:flight flight) "Flight location")
                            :emoji true}
                    :image_url (create-mapbox-str plane-url
-                                                 longitude
-                                                 latitude
+                                                 flight-lon
+                                                 flight-lat
                                                  night-mode
                                                  false)
                    :alt_text "flight overview"}]}))))
@@ -360,21 +317,6 @@
         (filter-direction airport direction)
         random-flight
         metric-system-vals)))
-
-(defn visible-flight
-  [airport]
-  (let [coordinates (get-bounding-box all-airports airport)
-        airport-iata (upper-case (name airport))]
-    (->> (pmap #(flight! airport-iata %) coordinates)
-         doall
-         first)))
-
-(defn post-flight!
-  "Gets flight, create string and post it to Slack"
-  [airport flight-direction response-url]
-  (-> (visible-flight airport)
-      (create-payload airport)
-      (post-to-slack! response-url)))
 
 (defn post-all-airports-flight!
   "Gets flight, create string and post it to Slack"
@@ -443,13 +385,27 @@
            (insert-slack-token! db/ds)))
     (timbre/error "OAuth state parameter didn't match!")))
 
+(defn retry-value
+  "Get the value from a retry request"
+  [params]
+  (timbre/info "Getting airport value from retry request")
+  (let [airport-v (-> params
+                      :payload
+                      (json/parse-string true)
+                      :actions
+                      first
+                      :value)]
+    (timbre/info "Retry value is" airport-v)
+    airport-v))
+
 (defn prepare-req-text
   "Middleware that splits the req-text into [direction] and [airport]."
   [handler]
   (fn
     [request]
     (if (= :post (:request-method request))
-      (let [raw-req-text (:text (:params request))
+      (let [params (:params request)
+            raw-req-text (or (:text params) (retry-value params))
             splits (-> raw-req-text
                        (split #"\W"))
             direction-k (->> splits
@@ -528,7 +484,6 @@
                :body (str "User " user-id " please say again. ATC does not know "
                           "`" (name airport) "`")})))))
 
-
   (POST "/which-flight-retry" req
         (let [request-id (utils/uuid)
               request (-> req
@@ -558,15 +513,14 @@
                                         :airport (name airport)
                                         :direction (name flight-direction)
                                         :is_retry 1})
-          (thread (post-all-airports-flight! airport response-url))
+          (thread (post-all-airports-flight! airport :any response-url))
           {:status 200
            :body "Standby..."})))
 
 (defroutes page-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
-       (let [request-id (utils/uuid)
-             request (:params req)]
+       (let [request (:params req)]
          (timbre/info "Received OAuth approval from Slack!")
          (thread (slack-access-token! request))
          (landingpage/homepage))))
@@ -611,7 +565,6 @@
   [handler]
   (fn
     [request]
-    (timbre/info "Keeping raw json intact...")
     (if (= :post (:request-method request))
       (let [raw-body (slurp (:body request))
             request' (-> request
@@ -619,6 +572,7 @@
                          (assoc :body (-> raw-body
                                           (.getBytes "UTF-8")
                                           java.io.ByteArrayInputStream.)))]
+        (timbre/info "Keeping raw json intact...")
         (handler request'))
       (handler request))))
 
