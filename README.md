@@ -17,6 +17,8 @@ The control tower bot supports any airport with scheduled flights in the world.
 To look for flights use the command `/spot` followed by either the IATA code of the airport, the name of the city in english or _random_ to look at a random airport e.g. `/spot TXL` or `/spot Berlin`.
 If the control tower doesn't see any flights in the air, you get back the current weather in that location.
 
+The airplane will sport the most common color for the airline it belongs to. Most airlines are included.
+
 On Slack the bot needs permissions for slash commands, and incoming hooks. At work we have a dedicated channel `#planespotting` for planespotting where each sighting is posted, allowing everyone on comment on it.
 
 *Note*:
