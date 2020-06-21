@@ -480,7 +480,8 @@
                    "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
                    " when requesting information.\n"
                    "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
-                   "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight")}) 
+                   "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight" 
+                   "- use `random` to spot at a random airport in the world e.g. `/spot random`")})
             
 
           (= request-type "airport")
