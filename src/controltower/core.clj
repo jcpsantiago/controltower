@@ -326,15 +326,14 @@
       (post-to-slack! response-url)))
 
 (defn request-airport-iata
-  [city user-id]
-  (let [ks (string->airportname :municipality city)]
-    {:status 200
-     :blocks [{:type "section"
-               :text {:type "plain_text"
-                      :text (str "This is ATC to user " user-id
-                                 " say again! Which airport?")}}
-              {:type "actions"
-               :elements (into [] (map slack-element-button ks))}]}))
+  [ks user-id]
+  {:status 200
+   :blocks [{:type "section"
+             :text {:type "plain_text"
+                    :text (str "This is ATC to user " user-id
+                               " say again! Which airport?")}}
+            {:type "actions"
+             :elements (into [] (map slack-element-button ks))}]})
 
 ;; routes and handlers
 (defn which-flight-allairports
@@ -499,15 +498,17 @@
             (timbre/info (str "Slack user " user-id
                               " is checking for airports at "
                               airport-str "..."))
-            (thread (post-to-slack! (request-airport-iata airport-str user-id) (:response_url request)))
-            {:status 200
-             :body ""})
-
-          :else (do
-                  (timbre/warn airport " is not known!")
+            (let [ks (string->airportname :municipality airport-str)]
+              (if (seq ks)
+                (do
+                  (thread (post-to-slack! (request-airport-iata ks user-id) (:response_url request)))
                   {:status 200
-                   :body (str "User " user-id " please say again. ATC does not know "
-                              "`" airport-str "`")}))))
+                   :body ""})
+                (do
+                    (timbre/warn airport " is not known!")
+                    {:status 200
+                     :body (str "User " user-id " please say again. ATC does not know "
+                                "`" airport-str "`")}))))))) 
 
   (POST "/which-flight-retry" req
         (let [request-id (utils/uuid)
