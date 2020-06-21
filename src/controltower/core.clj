@@ -430,7 +430,8 @@
             airport (if (= "random" airport-or-city)
                       (rand-nth (keys all-airports))
                       (keyword airport-or-city))
-            request-type (if (contains? all-airports airport) "airport" "city")  
+            request-type (or (= airport "help")
+                             (if (contains? all-airports airport) "airport" "city"))  
             request' (assoc request 
                             :direction direction 
                             :airport airport
@@ -468,6 +469,17 @@
                           " is requesting info. Checking for flights at "
                           (upper-case airport-str)) "...")
         (cond 
+          (= request-type "help")
+          (do
+           (timbre/info (str "Slack user " user-id " (" user-name ")"
+                         " is requesting help."))
+           {:status 200
+            :body (str "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
+                   " when requesting information.\n"
+                   "* `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
+                   "* `[direction]` can be `arriving` or `departing` or nothing to see any visible flight")}) 
+            
+
           (= request-type "airport")
           (do
             (timbre/info (str "request_id:" request-id " saving request in database"))
