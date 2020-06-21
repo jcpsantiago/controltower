@@ -232,7 +232,8 @@
          " (" (:aircraft flight) ") "
          (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
               " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")")
-         " currently moving at " (:speed flight) " km/h over " address
+         " currently moving at " (:speed flight) " km/h" 
+         (if (seq address) (str " over " address) "")
          " at an altitude of " (:altitude flight) " meters.")))
 
 (defn create-mapbox-str
