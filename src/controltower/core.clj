@@ -228,7 +228,8 @@
          (if (empty? airline-name)
            ""
            (str airline-name " "))
-         "flight " (:flight flight)
+         "flight " (str "<https://www.flightradar24.com/" 
+                        (:icao-flight flight) " | " (:flight flight) ">")
          " (" (:aircraft flight) ") "
          (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
               " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")")
