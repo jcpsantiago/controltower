@@ -476,10 +476,11 @@
            (timbre/info (str "Slack user " user-id " (" user-name ")"
                          " is requesting help."))
            {:status 200
-            :body (str "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
+            :body (str 
+                   "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
                    " when requesting information.\n"
-                   "* `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
-                   "* `[direction]` can be `arriving` or `departing` or nothing to see any visible flight")}) 
+                   "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
+                   "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight")}) 
             
 
           (= request-type "airport")
