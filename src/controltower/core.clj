@@ -219,11 +219,11 @@
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight airport-iata airline-name]
-  (let [gmaps-response (-> (create-gmaps-str (:lat flight) (:lon flight))
-                           get-api-data!
-                           :results
-                           first)
-        address (:formatted_address gmaps-response)]
+  (let [address (-> (create-gmaps-str (:lat flight) (:lon flight))
+                    get-api-data!
+                    :results
+                    first
+                    :formatted_address)]
     (str "`" airport-iata "` tower has visual on "
          (if (empty? airline-name)
            ""
@@ -532,6 +532,7 @@
 
 (defroutes page-routes
   (GET "/" [] (landingpage/homepage))
+  ; (GET "/privacy" [] (landingpage/privacy))
   (GET "/slack" req
        (let [request (:params req)]
          (timbre/info "Received OAuth approval from Slack!")
