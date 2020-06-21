@@ -99,7 +99,9 @@
                     :xmlns "http://www.w3.org/2000/svg"}
               [:path {:d "M342 10.874c.273-.86.69-1.512 1.252-1.956.562-.444 1.243-.667 2.044-.667.947 0 1.71.29 2.285.87.577.578.865 1.343.865 2.296 0 .834-.2 1.506-.6 2.014-.4.508-1.17 1-2.307 1.48l-.147.065c-1.864.786-2.994 1.665-3.39 2.637-.405-.977-1.533-1.856-3.384-2.637a4.018 4.018 0 0 0-.16-.066c-1.144-.48-1.914-.97-2.312-1.473-.398-.503-.597-1.177-.597-2.02 0-.954.29-1.72.868-2.298.58-.58 1.34-.87 2.282-.87.805 0 1.488.224 2.047.668.56.444.978 1.096 1.256 1.956z"
                       :fill "#ccc" :opacity ".5" :fill-rule "evenodd"}]]
-             " and mate in Berlin"]
+             " and mate in Berlin. "
+             [:a {:href "mailto:info@controltowerbot.com?subject=Hello!"
+                  :class "link moon-gray hover-orange"} "Talk to me!"]]
             [:div {:class "tc mt3 center"}
              [:a {:href "https://github.com/jcpsantiago/controltower"
                   :class "pr2 moon-gray hover-gray"}
