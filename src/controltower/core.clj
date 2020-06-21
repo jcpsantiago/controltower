@@ -4,7 +4,7 @@
    [buddy.core.mac :as mac]
    [cheshire.core :as json]
    [clojure.core.async :refer [thread]]
-   [clojure.string :refer [split lower-case upper-case]]
+   [clojure.string :refer [trim join split lower-case upper-case]]
    [clojure.walk :refer [keywordize-keys]]
    [compojure.core :refer [defroutes GET POST]]
    [compojure.route :as route]
@@ -398,6 +398,18 @@
     (timbre/info "Retry value is" airport-v)
     airport-v))
 
+(defn determine-direction
+ [tokens]
+ (let [k (if (< (count tokens) 2)
+          :any
+          (->> tokens
+           last
+           (re-find #"^arr|^dep|^any")
+           keyword))]
+  (if (nil? k)
+   :any
+   k)))
+
 (defn prepare-req-text
   "Middleware that splits the req-text into [direction] and [airport]."
   [handler]
@@ -406,35 +418,29 @@
     (if (= :post (:request-method request))
       (let [params (:params request)
             raw-req-text (or (:text params) (retry-value params))
-            ; FIXME: not working for cities with two tokens like Los Angeles
-            splits (-> raw-req-text
-                       (split #"\W"))
-            direction-k (->> splits
-                            first
-                            lower-case
-                            (re-find #"^arr|^dep|^any")
-                            keyword)
-            airport-k (-> splits
-                          last
-                          lower-case
-                          keyword)
-            airport (if (= airport-k :random)
+            tokens (-> raw-req-text
+                       trim
+                       lower-case
+                       (split #"\s"))
+            direction (determine-direction tokens) 
+            airport-or-city (if (= direction :any)
+                             (join " " tokens)
+                             (->> (filter #(not (= % (last tokens))) tokens)
+                                  (join " ")))
+            airport (if (= "random" airport-or-city)
                       (rand-nth (keys all-airports))
-                      airport-k)
-            direction (if (or (= airport :random) (nil? direction-k))
-                        :any
-                        direction-k)
-            airport-type (if (= airport-k :random) "random" "user-input")
+                      (keyword airport-or-city))
+            request-type (if (contains? all-airports airport) "airport" "city")  
             request' (assoc request 
                             :direction direction 
-                            :airport airport 
-                            :airport-type airport-type)]
-        (handler request'))
+                            :airport airport
+                            :request-type request-type)]
+       (handler request'))
       (handler request))))
 
 
 (defroutes api-routes
-  ;; There are two elements to a call: /spot [direction] [airport]
+  ;; There are two elements to a call: /spot [airport] [direction]
   ;; [direction] is set to "random" by default
   ;; [airport] always needs input and controltower will request input if it's missing
   ;; [airport] can be either a IATA code, a city or "random"
@@ -455,35 +461,41 @@
           user-id (:user_id request)
           user-name (:user_name request)
           airport (:airport req)
-          direction (:direction req)]
+          airport-str (name airport)
+          direction (:direction req)
+          request-type (:request-type req)]
         (timbre/info (str "Slack user " user-id " (" user-name ")"
                           " is requesting info. Checking for flights at "
-                          (upper-case (name airport)) "..."))
-        (if (contains? all-airports airport)
+                          (upper-case airport-str)) "...")
+        (cond 
+          (= request-type "airport")
           (do
             (timbre/info (str "request_id:" request-id " saving request in database"))
-            (sql/insert! db/ds :requests {:id request-id :user_id user-id
+            (sql/insert! db/ds :requests {:id request-id 
+                                          :user_id user-id
                                           :team_domain (:team_domain request)
                                           :team_id (:team_id request)
                                           :channel_id (:channel_id request)
                                           :channel_name (:channel_name request)
-                                          :airport (name airport)
+                                          :airport airport-str
                                           :direction (name direction)
                                           :is_retry 0})
             (which-flight-allairports user-id airport direction request))
-          (if (seq (string->airportkeys :municipality (name airport)))
-            (do
-              (timbre/info (str "Slack user " user-id
-                                " is checking for airports at "
-                                airport "..."))
-              (thread (post-to-slack! (request-airport-iata (name airport) user-id) (:response_url request)))
-              {:status 200
-               :body ""})
-            (do
-              (timbre/warn airport " is not known!")
-              {:status 200
-               :body (str "User " user-id " please say again. ATC does not know "
-                          "`" (name airport) "`")})))))
+
+          (= request-type "city")
+          (do
+            (timbre/info (str "Slack user " user-id
+                              " is checking for airports at "
+                              airport-str "..."))
+            (thread (post-to-slack! (request-airport-iata airport-str user-id) (:response_url request)))
+            {:status 200
+             :body ""})
+
+          :else (do
+                  (timbre/warn airport " is not known!")
+                  {:status 200
+                   :body (str "User " user-id " please say again. ATC does not know "
+                              "`" airport-str "`")}))))
 
   (POST "/which-flight-retry" req
         (let [request-id (utils/uuid)
