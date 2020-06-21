@@ -471,7 +471,8 @@
           (= request-type "airport")
           (do
             (timbre/info (str "request_id:" request-id " saving request in database"))
-            (sql/insert! db/ds :requests {:id request-id :user_id user-id
+            (sql/insert! db/ds :requests {:id request-id 
+                                          :user_id user-id
                                           :team_domain (:team_domain request)
                                           :team_id (:team_id request)
                                           :channel_id (:channel_id request)
@@ -494,7 +495,7 @@
                   (timbre/warn airport " is not known!")
                   {:status 200
                    :body (str "User " user-id " please say again. ATC does not know "
-                              "`" airport-str) "`"}))))
+                              "`" airport-str "`")}))))
 
   (POST "/which-flight-retry" req
         (let [request-id (utils/uuid)
