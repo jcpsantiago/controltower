@@ -429,8 +429,11 @@
             airport (if (= "random" airport-or-city)
                       (rand-nth (keys all-airports))
                       (keyword airport-or-city))
-            request-type (or (= airport :help)
-                             (if (contains? all-airports airport) "airport" "city"))  
+            request-type (cond
+                          (= airport :help) "help"
+                          (= airport :feedback) "feedback"
+                          (contains? all-airports airport) "airport" 
+                          :else "city")  
             request' (assoc request 
                             :direction direction 
                             :airport airport
