@@ -427,9 +427,9 @@
                              (join " " tokens)
                              (->> (filter #(not (= % (last tokens))) tokens)
                                   (join " ")))
-            airport (if (some #(= % "random") airport-or-city)
+            airport (if (= "random" airport-or-city)
                       (rand-nth (keys all-airports))
-                      (clojure.core/keyword airport-or-city))
+                      (keyword airport-or-city))
             request-type (if (contains? all-airports airport) "airport" "city")  
             request' (assoc request 
                             :direction direction 
@@ -466,7 +466,7 @@
           request-type (:request-type req)]
         (timbre/info (str "Slack user " user-id " (" user-name ")"
                           " is requesting info. Checking for flights at "
-                          (upper-case (name airport)) "..."))
+                          (upper-case airport-str)) "...")
         (cond 
           (= request-type "airport")
           (do
@@ -485,7 +485,7 @@
           (do
             (timbre/info (str "Slack user " user-id
                               " is checking for airports at "
-                              airport "..."))
+                              airport-str "..."))
             (thread (post-to-slack! (request-airport-iata airport-str user-id) (:response_url request)))
             {:status 200
              :body ""})
@@ -494,7 +494,7 @@
                   (timbre/warn airport " is not known!")
                   {:status 200
                    :body (str "User " user-id " please say again. ATC does not know "
-                              "`" (name airport) "`")}))))
+                              "`" airport-str) "`"}))))
 
   (POST "/which-flight-retry" req
         (let [request-id (utils/uuid)
