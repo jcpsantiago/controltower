@@ -361,7 +361,6 @@
         webhook-channel-id (:channel_id incoming-webhook)
         webhook-channel (:channel incoming-webhook)
         team (:team access-token-response)]
-    (println access-token-response)
     (sql/insert! connection :connected_teams {:slack_team_id (:id team)
                                               :team_name (:name team)
                                               :registering_user (:id (:authed_user access-token-response))
