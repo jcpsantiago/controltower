@@ -358,10 +358,12 @@
   (let [incoming-webhook (-> access-token-response
                              :incoming_webhook)
         webhook-url (:url incoming-webhook)
-        webhook-channel (:channel incoming-webhook)]
-    (sql/insert! connection :connected_teams {:slack_team_id (:team_id access-token-response)
-                                              :team_name (:team_name access-token-response)
-                                              :registering_user (:user_id access-token-response)
+        webhook-channel (:channel incoming-webhook)
+        team (:team access-token-response)]
+    (println access-token-response)
+    (sql/insert! connection :connected_teams {:slack_team_id (:id team)
+                                              :team_name (:name team)
+                                              :registering_user (:id (:authed_user access-token-response))
                                               :scope (:scope access-token-response)
                                               :access_token (:access_token access-token-response)
                                               :webhook_url webhook-url
