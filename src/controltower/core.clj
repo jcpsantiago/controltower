@@ -374,7 +374,7 @@
   (if (= (:state request) slack-oauth-url-state)
     (do
       (timbre/info "Replying to Slack OAuth and saving token to db")
-      (-> @(http/post "https://slack.com/api/oauth.access"
+      (-> @(http/post "https://slack.com/api/oauth.v2.access"
                       {:form-params {:client_id slack-client-id
                                      :client_secret slack-client-secret
                                      :code (:code request)
