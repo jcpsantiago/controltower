@@ -358,6 +358,7 @@
   (let [incoming-webhook (-> access-token-response
                              :incoming_webhook)
         webhook-url (:url incoming-webhook)
+        webhook-channel-id (:channel_id incoming-webhook)
         webhook-channel (:channel incoming-webhook)
         team (:team access-token-response)]
     (println access-token-response)
@@ -367,7 +368,8 @@
                                               :scope (:scope access-token-response)
                                               :access_token (:access_token access-token-response)
                                               :webhook_url webhook-url
-                                              :webhook_channel webhook-channel})
+                                              :webhook_channel webhook-channel
+                                              :webhook_channel_id webhook-channel-id})
     (timbre/info (str "Done! Team " (:team_name access-token-response)
                       " is connected!"))))
 
