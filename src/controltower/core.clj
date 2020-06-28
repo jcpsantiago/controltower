@@ -11,6 +11,7 @@
    [controltower.db :as db]
    [controltower.landingpage :as landingpage]
    [controltower.utils :as utils]
+   [controltower.edndata :refer [all-airports airlines-icao]]
    [org.httpkit.server :as server]
    [org.httpkit.client :as http]
    [org.httpkit.sni-client :as sni-client]
@@ -35,12 +36,6 @@
 (def slack-oauth-url-state (System/getenv "CONTROL_TOWER_SLACK_OAUTH_STATE"))
 (def slack-signing-secret (System/getenv "CONTROL_TOWER_SLACK_SIGNING_SECRET"))
 
-;; list of airports from https://datahub.io/core/airport-codes#data
-;; under Public Domain Dedication and License
-;; see scripts/bounding_boxes.clj for code to reproduce this file
-(def all-airports (utils/parse-edn "resources/airports_with_boxes.edn"))
-
-(def airlines-icao (utils/parse-edn "resources/airline_icao_info.edn"))
 
 (defn string->airportkeys
   [variable string]
