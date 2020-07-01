@@ -552,7 +552,7 @@
        (let [request (:params req)]
          (timbre/info "Received OAuth approval from Slack!")
          (thread (slack-access-token! request))
-         (landingpage/homepage))))
+         (landingpage/successpage))))
 
 
 (defn from-slack?

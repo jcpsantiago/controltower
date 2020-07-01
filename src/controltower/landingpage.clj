@@ -55,11 +55,11 @@
              :fill-rule "non-zero"}]]])
   ([url path]
    (svg-icon url path "16 16")))
+
 (defn homepage
   []
   (html5 {:lang "en"}
-         [:head (include-css "https://unpkg.com/tachyons@4.10.0/css/tachyons.min.css"
-                             "https://rsms.me/inter/inter.css")
+         [:head (include-css "https://unpkg.com/tachyons@4.10.0/css/tachyons.min.css")
           [:title "Control Tower"]
           [:meta {:charset "utf-8"
                   :name "viewport"
@@ -137,3 +137,30 @@ The control tower will reply privately if you call it anywhere else—this way y
               (svg-icon "mailto:info@controltowerbot.com?subject=Hello!"
                         "M12 .02c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm6.99 6.98l-6.99 5.666-6.991-5.666h13.981zm.01 10h-14v-8.505l7 5.673 7-5.672v8.504z"
                         "24 24")]]]]))
+
+
+(defn successpage
+  []
+  (html5 {:lang "en"}
+         [:head (include-css "https://unpkg.com/tachyons@4.10.0/css/tachyons.min.css")
+          [:title "Control Tower"]
+          [:meta {:charset "utf-8"
+                  :name "viewport"
+                  :content "width=device-width, initial-scale=1.0"}]]
+         [:body {:style "background-color:#8FAADC"}
+          [:div {:class "center"}
+            [:div {:class "pb7 mb5"
+                   :style "background-color:#8FAADC"}
+              [:div {:class "pt5 pt6-ns center"}
+               [:p {:class "tc"}
+                 [:a {:class "black code f4 b v-mid link"
+                      :href "/"}
+                  [:span "control"]
+                  [:img {:src "/img/ct_logo.svg" :class "mw1 ph2 v-mid"}]
+                  [:span "tower"]]]]
+              [:div {:class "tc avenir pt4 w-90 center"}
+               [:p {:class "mt1 mb3 f2-ns f3 fw7"} "The control tower is ready and waiting for you!"]
+               [:p "Just open Slack and type "
+                [:span {:class "code"} "/spot help"]
+                " to learn how to get started. Have fun!"]]]]]))
+
