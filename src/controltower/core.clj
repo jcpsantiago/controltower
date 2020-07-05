@@ -213,20 +213,22 @@
 (defn create-flight-str
   "Creates a string with information about the flight"
   [flight airport-iata airline-name]
-  (let [gmaps-response (-> (create-gmaps-str (:lat flight) (:lon flight))
-                           get-api-data!
-                           :results
-                           first)
-        address (:formatted_address gmaps-response)]
+  (let [address (-> (create-gmaps-str (:lat flight) (:lon flight))
+                    get-api-data!
+                    :results
+                    first
+                    :formatted_address)]
     (str "`" airport-iata "` tower has visual on "
          (if (empty? airline-name)
            ""
            (str airline-name " "))
-         "flight " (:flight flight)
+         "flight " (str "<https://www.flightradar24.com/" 
+                        (:icao-flight flight) " | " (:flight flight) ">")
          " (" (:aircraft flight) ") "
          (str "from " (iata->city (keyword (lower-case (:start flight)))) " (" (:start flight) ")"
               " to " (iata->city (keyword (lower-case (:end flight)))) " (" (:end flight) ")")
-         " currently moving at " (:speed flight) " km/h over " address
+         " currently moving at " (:speed flight) " km/h" 
+         (if (seq address) (str " over " address) "")
          " at an altitude of " (:altitude flight) " meters.")))
 
 (defn create-mapbox-str
@@ -545,6 +547,7 @@
 
 (defroutes page-routes
   (GET "/" [] (landingpage/homepage))
+  ; (GET "/privacy" [] (landingpage/privacy))
   (GET "/slack" req
     (let [request (:params req)]
       (timbre/info "Received OAuth approval from Slack!")
