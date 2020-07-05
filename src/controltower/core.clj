@@ -36,10 +36,9 @@
 (def slack-oauth-url-state (System/getenv "CONTROL_TOWER_SLACK_OAUTH_STATE"))
 (def slack-signing-secret (System/getenv "CONTROL_TOWER_SLACK_SIGNING_SECRET"))
 
-
 (defn string->airportkeys
   [variable string]
-  (keep (fn [[k v]] (when (= (lower-case (variable v)) 
+  (keep (fn [[k v]] (when (= (lower-case (variable v))
                              (lower-case string)) k)) all-airports))
 
 (defn string->airportname
@@ -160,7 +159,7 @@
                                        (seq (:start v))
                                        (seq (:end v))
                                        (seq (:flight v)))
-                                k)) flight-data))]
+                              k)) flight-data))]
     (if (empty? ks)
       (do
         (timbre/info "No flights in the air, returning empty map.")
@@ -340,8 +339,8 @@
         webhook-url (:webhook_url webhook-vars)
         channel-id (:channel_id request)
         response-url (if (= channel-id webhook-channel-id)
-                         webhook-url
-                         (:response_url request))]
+                       webhook-url
+                       (:response_url request))]
     (timbre/info "Starting to post flight")
     (thread (post-all-airports-flight! airport direction response-url))
     (timbre/info "Replying immediately to slack")
@@ -377,9 +376,9 @@
                                      :client_secret slack-client-secret
                                      :code (:code request)
                                      :state slack-oauth-url-state}})
-           :body
-           (json/parse-string true)
-           (insert-slack-token! db/ds)))
+          :body
+          (json/parse-string true)
+          (insert-slack-token! db/ds)))
     (timbre/error "OAuth state parameter didn't match!")))
 
 (defn retry-value
@@ -396,16 +395,16 @@
     airport-v))
 
 (defn determine-direction
- [tokens]
- (let [k (if (< (count tokens) 2)
-          :any
-          (->> tokens
-           last
-           (re-find #"^arr|^dep|^any")
-           keyword))]
-  (if (nil? k)
-   :any
-   k)))
+  [tokens]
+  (let [k (if (< (count tokens) 2)
+            :any
+            (->> tokens
+                 last
+                 (re-find #"^arr|^dep|^any")
+                 keyword))]
+    (if (nil? k)
+      :any
+      k)))
 
 (defn prepare-req-text
   "Middleware that splits the req-text into [direction] and [airport]."
@@ -419,26 +418,25 @@
                        trim
                        lower-case
                        (split #"\s"))
-            direction (determine-direction tokens) 
+            direction (determine-direction tokens)
             airport-or-city (if (= direction :any)
-                             (join " " tokens)
-                             (->> (filter #(not (= % (last tokens))) tokens)
-                                  (join " ")))
+                              (join " " tokens)
+                              (->> (filter #(not (= % (last tokens))) tokens)
+                                   (join " ")))
             airport (if (= "random" airport-or-city)
                       (rand-nth (keys all-airports))
                       (keyword airport-or-city))
             request-type (cond
-                          (= airport :help) "help"
-                          (= airport :feedback) "feedback"
-                          (contains? all-airports airport) "airport" 
-                          :else "city")  
-            request' (assoc request 
-                            :direction direction 
+                           (= airport :help) "help"
+                           (= airport :feedback) "feedback"
+                           (contains? all-airports airport) "airport"
+                           :else "city")
+            request' (assoc request
+                            :direction direction
                             :airport airport
                             :request-type request-type)]
-       (handler request'))
+        (handler request'))
       (handler request))))
-
 
 (defroutes api-routes
   ;; There are two elements to a call: /spot [airport] [direction]
@@ -465,95 +463,93 @@
           airport-str (name airport)
           direction (:direction req)
           request-type (:request-type req)]
-        (timbre/info (str "Slack user " user-id " (" user-name ")"
-                          " is requesting info. Checking for flights at "
-                          (upper-case airport-str)) "...")
-        (cond 
-          (= request-type "help")
-          (do
-           (timbre/info (str "Slack user " user-id " (" user-name ")"
-                         " is requesting help."))
-           {:status 200
-            :body (str 
-                   "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
-                   " when requesting information.\n"
-                   "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
-                   "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight\n" 
-                   "- use `random` to spot at a random airport in the world e.g. `/spot random`")})
-            
+      (timbre/info (str "Slack user " user-id " (" user-name ")"
+                        " is requesting info. Checking for flights at "
+                        (upper-case airport-str)) "...")
+      (cond
+        (= request-type "help")
+        (do
+          (timbre/info (str "Slack user " user-id " (" user-name ")"
+                            " is requesting help."))
+          {:status 200
+           :body (str
+                  "User " user-id " this is ATC. Use the format `/spot [airport] [direction (optional)]`"
+                  " when requesting information.\n"
+                  "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
+                  "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight\n"
+                  "- use `random` to spot at a random airport in the world e.g. `/spot random`")})
 
-          (= request-type "airport")
-          (do
-            (timbre/info (str "request_id:" request-id " saving request in database"))
-            (sql/insert! db/ds :requests {:id request-id 
-                                          :user_id user-id
-                                          :team_domain (:team_domain request)
-                                          :team_id (:team_id request)
-                                          :channel_id (:channel_id request)
-                                          :channel_name (:channel_name request)
-                                          :airport airport-str
-                                          :direction (name direction)
-                                          :is_retry 0})
-            (which-flight-allairports user-id airport direction request))
+        (= request-type "airport")
+        (do
+          (timbre/info (str "request_id:" request-id " saving request in database"))
+          (sql/insert! db/ds :requests {:id request-id
+                                        :user_id user-id
+                                        :team_domain (:team_domain request)
+                                        :team_id (:team_id request)
+                                        :channel_id (:channel_id request)
+                                        :channel_name (:channel_name request)
+                                        :airport airport-str
+                                        :direction (name direction)
+                                        :is_retry 0})
+          (which-flight-allairports user-id airport direction request))
 
-          (= request-type "city")
-          (do
-            (timbre/info (str "Slack user " user-id
-                              " is checking for airports at "
-                              airport-str "..."))
-            (let [ks (string->airportname :municipality airport-str)]
-              (if (seq ks)
-                (do
-                  (thread (post-to-slack! (request-airport-iata ks user-id) (:response_url request)))
-                  {:status 200
-                   :body ""})
-                (do
-                    (timbre/warn airport " is not known!")
-                    {:status 200
-                     :body (str "User " user-id " please say again. ATC does not know "
-                                "`" airport-str "`")}))))))) 
+        (= request-type "city")
+        (do
+          (timbre/info (str "Slack user " user-id
+                            " is checking for airports at "
+                            airport-str "..."))
+          (let [ks (string->airportname :municipality airport-str)]
+            (if (seq ks)
+              (do
+                (thread (post-to-slack! (request-airport-iata ks user-id) (:response_url request)))
+                {:status 200
+                 :body ""})
+              (do
+                (timbre/warn airport " is not known!")
+                {:status 200
+                 :body (str "User " user-id " please say again. ATC does not know "
+                            "`" airport-str "`")})))))))
 
   (POST "/which-flight-retry" req
-        (let [request-id (utils/uuid)
-              request (-> req
-                          :params
-                          :payload
-                          (json/parse-string true))
-              user-id (:id (:user request))
-              received-action (first (:actions request))
-              airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
-              flight-direction (keyword (:value received-action))
-              team-id (:id (:team request))
-              webhook-vars (get-webhook-vars! team-id)
-              webhook-channel-id (:webhook_channel_id webhook-vars)
-              webhook-url (:webhook_url webhook-vars)
-              channel-id (:id (:channel request))
-              response-url (if (= channel-id webhook-channel-id)
-                             webhook-url
-                             (:response_url request))]
-          (timbre/info (str "Slack user " user-id
-                            " is retrying. Checking for flights at "
-                            airport "..."))
-          (sql/insert! db/ds :requests {:id request-id :user_id user-id
-                                        :team_domain (:domain (:team request))
-                                        :team_id (:id (:team request))
-                                        :channel_id channel-id
-                                        :channel_name (:name (:channel request))
-                                        :airport (name airport)
-                                        :direction (name flight-direction)
-                                        :is_retry 1})
-          (thread (post-all-airports-flight! airport :any response-url))
-          {:status 200
-           :body "Standby..."})))
+    (let [request-id (utils/uuid)
+          request (-> req
+                      :params
+                      :payload
+                      (json/parse-string true))
+          user-id (:id (:user request))
+          received-action (first (:actions request))
+          airport (keyword (re-find #"^\w{3}" (:action_id received-action)))
+          flight-direction (keyword (:value received-action))
+          team-id (:id (:team request))
+          webhook-vars (get-webhook-vars! team-id)
+          webhook-channel-id (:webhook_channel_id webhook-vars)
+          webhook-url (:webhook_url webhook-vars)
+          channel-id (:id (:channel request))
+          response-url (if (= channel-id webhook-channel-id)
+                         webhook-url
+                         (:response_url request))]
+      (timbre/info (str "Slack user " user-id
+                        " is retrying. Checking for flights at "
+                        airport "..."))
+      (sql/insert! db/ds :requests {:id request-id :user_id user-id
+                                    :team_domain (:domain (:team request))
+                                    :team_id (:id (:team request))
+                                    :channel_id channel-id
+                                    :channel_name (:name (:channel request))
+                                    :airport (name airport)
+                                    :direction (name flight-direction)
+                                    :is_retry 1})
+      (thread (post-all-airports-flight! airport :any response-url))
+      {:status 200
+       :body "Standby..."})))
 
 (defroutes page-routes
   (GET "/" [] (landingpage/homepage))
   (GET "/slack" req
-       (let [request (:params req)]
-         (timbre/info "Received OAuth approval from Slack!")
-         (thread (slack-access-token! request))
-         (landingpage/successpage))))
-
+    (let [request (:params req)]
+      (timbre/info "Received OAuth approval from Slack!")
+      (thread (slack-access-token! request))
+      (landingpage/successpage))))
 
 (defn from-slack?
   [timestamp payload slack-signature]
@@ -604,7 +600,6 @@
         (timbre/info "Keeping raw json intact...")
         (handler request'))
       (handler request))))
-
 
 (def app
   (-> app-routes
