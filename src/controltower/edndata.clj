@@ -8,4 +8,4 @@
 ;; see scripts/bounding_boxes.clj for code to reproduce this file
 (def all-airports (utils/parse-edn "resources/airports_with_boxes.edn"))
 
-(def airlines-icao (utils/parse-edn "resources/airline_icao_info.edn"))
+(def airlines-icao (utils/parse-edn "resources/airlines_icao.edn"))
