@@ -88,17 +88,14 @@
 
 (defn airline-icao-map
   [airline-map]
-  (let [icao (keyword (:icao airline-map))]
-    {icao airline-map}))
-
+  (let [icao (mapv #(keyword (:icao %)) airline-map)]
+    (zipmap icao airline-map)))
 
 
 (println "Collecting Airline ICAO codes")
 (->> (html->map wiki-airlines)
      (filter (every-pred complete-iata? complete-icao? not-defunct?)) 
-     (pmap airline-icao-map)
-     (into [])
-     doall
+     airline-icao-map
      pr-str
      (spit "../resources/airlines_icao.edn"))
 
