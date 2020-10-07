@@ -86,16 +86,16 @@
 (def complete-iata? (partial complete? :iata))
 
 
-(defn airline-icao-map
-  [airline-map]
-  (let [icao (mapv #(keyword (:icao %)) airline-map)]
-    (zipmap icao airline-map)))
+(defn airline-code-map
+  [k airline-map]
+  (let [code (mapv #(keyword (k %)) airline-map)]
+    (zipmap code airline-map)))
 
 
 (println "Collecting Airline ICAO codes")
 (->> (html->map wiki-airlines)
      (filter (every-pred complete-iata? complete-icao? not-defunct?)) 
-     airline-icao-map
+     (airline-code-map :icao)
      pr-str
      (spit "../resources/airlines_icao.edn"))
 
@@ -150,8 +150,7 @@
 
 (defn maxmin-lonlat
   [airport]
-  (let [iata (:iata_code airport)
-        latitude (edn/read-string (:latitude_deg airport))
+  (let [latitude (edn/read-string (:latitude_deg airport))
         longitude (edn/read-string (:longitude_deg airport))
         latitude-dif (calc-latitude-dif 5500)
         longitude-dif (calc-longitude-dif latitude 5500)
@@ -159,8 +158,7 @@
         lonmax (+ longitude longitude-dif)
         latmin (- latitude latitude-dif)
         lonmin (- longitude longitude-dif)]
-    {(keyword (s/lower-case iata))
-     (conj airport [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])}))
+     (conj airport [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])))
 
 
 (defn checkpoint-bounding-boxes [x]
@@ -174,12 +172,9 @@
      airports-to-keep
      checkpoint-bounding-boxes
      (pmap maxmin-lonlat)
-     (into [])
-     doall
+     (airline-code-map :iata_code)
      pr-str
      (spit "../resources/airports_with_boxes.edn"))
-
-
 
 
 (println "All done!")
