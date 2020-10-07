@@ -1,6 +1,6 @@
 #!/usr/bin/env bb
 
-(ns jcpsantiago.controltower.airportsscript
+(ns jcpsantiago.controltower.scripts.airportsscript
   (:require [babashka.curl :as curl]
             [clojure.string :as s]
             [clojure.data.csv :as csv]
@@ -30,8 +30,9 @@
 
 
 ; https://gist.github.com/jackrusher/97734e71bb748ed9c263d6e3daea2b38
-(defn extract-tables [html]
+(defn extract-tables 
   "Takes an html page and extracts a table element."
+  [html]
   (mapv (fn [table]
           (mapv #(mapv deepest-text
                        (hs/select (hs/or (hs/tag :th) (hs/tag :td)) %))
@@ -66,11 +67,13 @@
     (println "Joining rows and headers...")
     (mapv #(zipmap headers %) rows)))
 
+
 (defn complete?
   [k coll]
   (every? true? (map not [(= (k coll) "\n")
                           (= (k coll) "n/a")
                           (= (k coll) "")])))
+
 
 (defn not-defunct?
   [coll]
