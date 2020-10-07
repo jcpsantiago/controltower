@@ -88,7 +88,8 @@
 
 (defn airline-code-map
   [k airline-map]
-  (let [code (mapv #(keyword (k %)) airline-map)]
+  (let [code (->> airline-map
+                  (mapv #(keyword (s/lower-case (k %)))))]
     (zipmap code airline-map)))
 
 
