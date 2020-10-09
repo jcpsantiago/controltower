@@ -206,6 +206,7 @@
      checkpoint-bounding-boxes
      (pmap maxmin-lonlat)
      (map #(code-map :iata_code %))
+     (into {})
      pr-str
      (spit "../resources/airports_with_boxes.edn"))
 
