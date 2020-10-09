@@ -278,8 +278,11 @@
       (let [flight-lon (:lon flight)
             flight-lat (:lat flight)
             airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
-            callsign (keyword (:icao-callsign flight))
-            airline-name (get-in airlines-icao [callsign :airline])
+            callsign (-> flight
+                         :icao-callsign
+                         lower-case
+                         keyword)
+            airline-name (get-in airlines-icao [callsign :airline_name])
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
             plane-url (str (if (contains? airlines-icao callsign)
                              (utils/replace-airline-iata airplane-img-url airline-iata)
