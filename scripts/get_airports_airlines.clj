@@ -2,19 +2,15 @@
 
 (ns jcpsantiago.controltower.scripts.airportsscript
   (:require [babashka.curl :as curl]
+            [clojure.java.io :as io]
             [clojure.string :as s]
             [clojure.data.csv :as csv]
             [clojure.edn :as edn]
-            [babashka.pods :as pods]
+            [clojure.java.shell :as shell]
             [cheshire.core :as json]))
 
 
-(pods/load-pod "bootleg")
-(require '[pod.retrogradeorbit.bootleg.utils :refer [convert-to]]
-         '[pod.retrogradeorbit.hickory.select :as hs])
-
-
-;; Utility functions 
+;; Utility functions ;;
 (defn csv-data->maps [csv-data]
   (println "Parsing csv into maps...")
   (map zipmap
@@ -27,20 +23,14 @@
 (defn code-map
   "Nests a map using a kv from the map as the top-level keyword."
   [target-k m]
-  (println "Nesting map using " target-k " as keyword...")
   (let [k (-> m target-k s/lower-case keyword)]
     {k m}))
 
 
 ;; Airline data ;;
-; (def wiki-airlines 
-;   (-> "https://en.wikipedia.org/wiki/List_of_airline_codes"
-;       curl/get
-;       :body))
-
-
 ;; Airline colors kindly provided by AirHex.com
 ;; csv file is *not* version-controlled and won't be shared
+;; I changed Etihad's main color to #C4921B (official color)
 (def airline-colors
   (->> "../resources/airline-colors-serialized.csv"
        slurp
@@ -53,34 +43,37 @@
 (def stack-api-key (System/getenv "AVIATIONSTACK_API_KEY"))
 (def stack-url "http://api.aviationstack.com/v1/airlines")
 
+
 (def stack-airlines
-  (let [full-url (str stack-url "?access_key=" stack-api-key "&offset=")
-        ; need to query the API first to know what's the total n
-        first-url (str full-url 0)
-        first-res (-> first-url curl/get :body (json/parse-string true))
-        first-data (:data first-res)
-        offset-seq (as-> first-res $
-                         (:pagination $)
-                         (:total $)
-                         (range 1 $ 100)
-                         (drop 1 $))
-        url-seq (map #(str full-url %) offset-seq)]
-    (reduce (fn [p c]
-             (let [res (-> c 
-                           curl/get 
-                           :body 
-                           (json/parse-string true) 
-                           :data)] 
-              (println c)
-              (reduce conj p res)))
-            first-data
-            url-seq)))
+  (if (.exists (io/file "../resources/stack_airlines.edn"))
+    (edn/read-string (slurp "../resources/stack_airlines.edn"))
+    (let [full-url (str stack-url "?access_key=" stack-api-key "&offset=")
+          ; need to query the API first to know what's the total n
+          first-url (str full-url 0)
+          first-res (-> first-url curl/get :body (json/parse-string true))
+          first-data (:data first-res)
+          offset-seq (as-> first-res $
+                           (:pagination $)
+                           (:total $)
+                           (range 1 $ 100)
+                           (drop 1 $))
+          url-seq (map #(str full-url %) offset-seq)]
+      (reduce (fn [p c]
+               (let [res (-> c 
+                             curl/get 
+                             :body 
+                             (json/parse-string true) 
+                             :data)] 
+                (println c)
+                (reduce conj p res)))
+              first-data
+              url-seq))))
 
 
 ;; Can't use the API more than 500 calls/month
-(->> stack-airlines
-     pr-str
-     (spit "./stack-airlines-dump.edn"))
+; (->> stack-airlines
+;      pr-str
+;      (spit "./stack-airlines-dump.edn"))
 
 
 (defn merge-maps 
@@ -92,99 +85,60 @@
 
 
 (def airlines-icao (->> stack-airlines 
-                      (filter #(and 
-                                 (seq (:icao_code %)) 
-                                 (= (:status %) "active")))
-                      (map #(code-map :icao_code %)) 
-                      (filter #(contains? airline-colors (first (keys %)))) 
-                      (into {})
-                      (map merge-colors)))
+                        (filter #(and 
+                                   (seq (:icao_code %)) 
+                                   (= (:status %) "active")))
+                        ;; FIXME: Add Lufthansa
+                        (map #(code-map :icao_code %)) 
+                        (filter #(contains? airline-colors (first (keys %)))) 
+                        (into {})
+                        (map merge-colors)
+                        (into {})))
 
 
+(println "Saving airlines db...")
 (->> airlines-icao
      pr-str
      (spit "../resources/airlines_icao.edn"))
 
 
-; https://gist.github.com/jackrusher/97734e71bb748ed9c263d6e3daea2b38
-(defn deepest-text
-  "Drill down to the deepest text node(s) and return them as a string."
-  [node]
-  (cond (vector? node) (apply str (mapcat deepest-text node))
-        (map? node) (deepest-text (:content node))
-        :else node))
+(println "")
+;; Airplanes ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(def airplane-svg (slurp "./airplane.svg"))
+(def root-path "../resources/airplanes/")
 
 
-; https://gist.github.com/jackrusher/97734e71bb748ed9c263d6e3daea2b38
-(defn extract-tables 
-  "Takes an html page and extracts a table element."
-  [html]
-  (mapv (fn [table]
-          (mapv #(mapv deepest-text
-                       (hs/select (hs/or (hs/tag :th) (hs/tag :td)) %))
-                (hs/select (hs/tag :tr) table)))
-        (->> (convert-to html :hickory) 
-             (hs/select (hs/tag :table)))))
+(defn spit-airplane [root-path coll] 
+  (doseq [[k v] coll]
+    (spit (str root-path "svg/" (name k) ".svg") v)))
 
 
-(defn to-keyword
-  "This takes a string and returns a normalized keyword."
-  [input]
-  (-> input
-      s/lower-case
-      (s/replace \space \-)
-      ; critical! there are some hidden characters that mess up
-      ; subestting later
-      s/trim
-      keyword))
+(->> airlines-icao
+     (map (fn [[k v]] 
+            [k (s/replace airplane-svg "#5d9cec" (:main-color v))])) 
+     (spit-airplane root-path))
 
 
-(defn html->map 
-  "Extracts an html table and turns it into a map."
-  [wiki-airlines] 
-  (let [table (first (extract-tables wiki-airlines))
-        headers (->> table
-                     first
-                     (map to-keyword)
-                     vec)
-        rows (->> table
-                  (drop 1)
-                  (mapv #(mapv s/trim-newline %)))]
-    (println "Joining rows and headers...")
-    (mapv #(zipmap headers %) rows)))
+(defn ready-png-airplanes [root-path airline] 
+  (let [icao (name (first airline))]
+    (println "Converting " icao " to PNG")
+    (shell/sh "bash" "-c"
+              (str "rsvg-convert -h 100 " root-path "svg/" icao ".svg > "
+                   root-path "png/base/" icao ".png"))
+    (doseq [angle (range 0 360 12)] 
+      (println "Rotating " icao " with angle " angle)
+      (shell/sh "bash" "-c"
+                (str "convert " root-path "png/base/" icao ".png "
+                     "-distort ScaleRotateTranslate " angle
+                     " +repage " root-path "png/rotations/" icao "_" angle ".png")))))
 
 
-(defn complete?
-  [k coll]
-  (every? true? (map not [(= (k coll) "\n")
-                          (= (k coll) "n/a")
-                          (= (k coll) "")])))
+(println "Converting SVG airplanes to PNG and rotating...")
+(pmap #((partial ready-png-airplanes root-path) %) airlines-icao)
 
 
-(defn not-defunct?
-  [coll]
-  (if (seq (:comments coll))
-    (let [c (s/lower-case (:comments coll))]
-      (not (s/includes? c "defunct")))
-  ; FIXME: some rows don't have a comments td ¯\_(ツ)_/¯
-  ; I'll consider these as not defunct for now
-    true))
-
-
-(def complete-icao? (partial complete? :icao))
-(def complete-iata? (partial complete? :iata))
-
-
-; FIXME: remove this, not needed anymore since using aviationstack
-;(println "Collecting Airline ICAO codes")
-;(->> (html->map wiki-airlines)
-;     (filter (every-pred complete-iata? complete-icao? not-defunct?)) 
-;     (code-map :icao)
-;     pr-str
-;     (spit "../resources/airlines_icao.edn"))
-
-
-;; Airport data ;;
+(println "")
+;; Airport data ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn all-airports []
   (println "Getting airport data from ourairports.com...")
   (-> "https://ourairports.com/data/airports.csv"
@@ -229,10 +183,14 @@
         longitude (edn/read-string (:longitude_deg airport))
         latitude-dif (calc-latitude-dif 5500)
         longitude-dif (calc-longitude-dif latitude 5500)
-        latmax (+ latitude latitude-dif)
-        lonmax (+ longitude longitude-dif)
-        latmin (- latitude latitude-dif)
-        lonmin (- longitude longitude-dif)]
+        lat+ (+ latitude latitude-dif)
+        lon+ (+ longitude longitude-dif)
+        lat- (- latitude latitude-dif)
+        lon- (- longitude longitude-dif)
+        latmin (min lat+ lat-)
+        latmax (max lat+ lat-)
+        lonmin (min lon+ lon-)
+        lonmax (max lon+ lon-)]
      (conj airport [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])))
 
 
@@ -247,7 +205,7 @@
      airports-to-keep
      checkpoint-bounding-boxes
      (pmap maxmin-lonlat)
-     (code-map :iata_code)
+     (map #(code-map :iata_code %))
      pr-str
      (spit "../resources/airports_with_boxes.edn"))
 
