@@ -285,10 +285,8 @@
                          keyword)
             airline-name (get-in airlines-icao [callsign :airline_name])
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
-            plane-url (str (if (contains? airlines-icao callsign)
-                             (utils/replace-airline-icao airplane-img-url (name callsign))
-                             ; FIXME: there is no `default` at the moment..
-                             (utils/replace-airline-icao airplane-img-url "DEFAULT"))
+                      ; FIXME: there is no `default` at the moment..
+            plane-url (str (utils/replace-airline-icao airplane-img-url (name callsign))
                            "_" (apply int plane-angle) ".png")]
         (timbre/info (str "Creating payload for " flight))
         {:blocks [{:type "section"
