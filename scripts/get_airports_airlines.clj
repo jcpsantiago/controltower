@@ -83,12 +83,26 @@
   
 (def merge-colors (partial merge-maps airline-colors))
 
+(def airlines-with-missing
+  ;; Lufthansa (non-cargo) is stragenly missing from the aviationstack data ¯\_(ツ)_/¯
+  (conj stack-airlines {:date_founded "1953" 
+                        :fleet_average_age "missing"
+                        :fleet_size "missing"
+                        :country_iso2 "DE"
+                        :iata_prefix_accounting "LH"
+                        :airline_name "Lufthansa"
+                        :type "Scheduled"
+                        :callsign "LUFTHANSA"
+                        :country_name "Germany"
+                        :status "active"
+                        :iata_code "LH"
+                        :icao_code "DLH"
+                        :hub_code "FRA"}))
 
-(def airlines-icao (->> stack-airlines 
+(def airlines-icao (->> airlines-with-missing 
                         (filter #(and 
                                    (seq (:icao_code %)) 
                                    (= (:status %) "active")))
-                        ;; FIXME: Add Lufthansa
                         (map #(code-map :icao_code %)) 
                         (filter #(contains? airline-colors (first (keys %)))) 
                         (into {})
@@ -134,7 +148,7 @@
 
 
 (println "Converting SVG airplanes to PNG and rotating...")
-(pmap #((partial ready-png-airplanes root-path) %) airlines-icao)
+(doall (pmap #((partial ready-png-airplanes root-path) %) airlines-icao))
 
 
 (println "")
