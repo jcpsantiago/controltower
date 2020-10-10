@@ -29,7 +29,7 @@
 (def openweather-api-key (System/getenv "OPENWEATHER_API_KEY"))
 (def port (Integer/parseInt (or (System/getenv "PORT") "3000")))
 (def mapbox-api-key (System/getenv "MAPBOX_ACCESS_TOKEN"))
-(def airplane-img-url (System/getenv "CONTROL_TOWER_TEMP_PLANE_URL"))
+(def airplane-img-url (System/getenv "CONTROL_TOWER_AIRPLANE_IMG_URL"))
 (def airplane-angles (range 0 372 12))
 (def slack-client-id (System/getenv "CONTROL_TOWER_CLIENT_ID"))
 (def slack-client-secret (System/getenv "CONTROL_TOWER_CLIENT_SECRET"))
@@ -277,7 +277,8 @@
                    :alt_text (str airport-iata " airport")}]})
       (let [flight-lon (:lon flight)
             flight-lat (:lat flight)
-            airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
+            ; FIXME: remove line if just ICAO is enough
+            ; airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
             callsign (-> flight
                          :icao-callsign
                          lower-case
@@ -285,9 +286,10 @@
             airline-name (get-in airlines-icao [callsign :airline_name])
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
             plane-url (str (if (contains? airlines-icao callsign)
-                             (utils/replace-airline-iata airplane-img-url airline-iata)
-                             (utils/replace-airline-iata airplane-img-url "DEFAULT"))
-                           (apply int plane-angle) ".png")]
+                             (utils/replace-airline-icao airplane-img-url (name callsign))
+                             ; FIXME: there is no `default` at the moment..
+                             (utils/replace-airline-icao airplane-img-url "DEFAULT"))
+                           "_" (apply int plane-angle) ".png")]
         (timbre/info (str "Creating payload for " flight))
         {:blocks [{:type "section"
                    :text {:type "mrkdwn"

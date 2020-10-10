@@ -12,9 +12,9 @@
   [uri]
   (drop 1 (s/split uri #"://|:|@|/")))
 
-(defn replace-airline-iata
-  [image-url iata-code]
-  (s/replace image-url "_IATA_CODE_" iata-code))
+(defn replace-airline-icao
+  [image-url icao-code]
+  (s/replace image-url "_ICAO_" icao-code))
 
 (defn create-map-from-uri
   [uri]
