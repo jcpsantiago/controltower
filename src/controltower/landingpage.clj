@@ -112,7 +112,7 @@ The control tower will reply privately if you call it anywhere else—this way y
                   (plane-svg "/img/QF.svg" "Qantas" "dn")]
                 
                 [:div {:class ""}
-                 [:p "The airplane marker will feature the most common color from the airline’s logo. Around 200 airlines are supported and more can be added."]]
+                 [:p "The airplane marker will feature the most common color from the airline’s logo. We support more than 800 airlines thanks for the nice folks at www.airhex.com."]]
                 [:div {:class ""}
                  [:p [:span {:class "b"} "Privacy policy: "]
                   "The control tower does not store any information beyond the name of the team connected, the user id and time of each request. No other sensitive information is stored."]]]]
