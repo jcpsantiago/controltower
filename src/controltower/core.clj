@@ -286,8 +286,6 @@
              :alt_text (str airport-iata " airport")}]})
       (let [flight-lon (:lon flight)
             flight-lat (:lat flight)
-            ; FIXME: remove line if just ICAO is enough
-            ; airline-iata (re-find #"^[A-Z0-9]{2}" (:flight flight))
             callsign (-> flight
                          :icao-callsign
                          lower-case
