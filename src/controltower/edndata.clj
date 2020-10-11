@@ -1,6 +1,5 @@
 (ns controltower.edndata
-  (:require
-    [controltower.utils :as utils])
+  (:require [controltower.utils :as utils])
   (:gen-class))
 
 ;; list of airports from https://datahub.io/core/airport-codes#data
