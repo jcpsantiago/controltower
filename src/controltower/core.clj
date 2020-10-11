@@ -92,6 +92,7 @@
 (defn post-to-slack!
   "Post message to Slack"
   [payload url]
+  (timbre/info "Posting payload to Slack: " payload)
   (-> @(http/post url
                   {:body (json/generate-string payload), :content-type :json})
       (utils/log-http-status "Slack" "POST")))
