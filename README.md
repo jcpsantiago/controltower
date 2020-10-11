@@ -28,7 +28,9 @@ On Slack the bot needs permissions for slash commands, and incoming hooks. At wo
 ## Disclaimer
 Airport data from [OurAirports](https://ourairports.com/)
 
-Airline logos used to create aircraft with correct colors from [Travel Payouts](https://support.travelpayouts.com/hc/en-us/articles/203956073-Airline-logos)
+Airline data comes from [Aviation Stack](https://aviationstack.com)
+
+Airline colors to create the airplanes were kindly provided by the awesome folks at [AirHex](https://airhex.com)
 
 Icons made by <a href="https://www.flaticon.com/authors/freepik" title="Freepik">Freepik</a> from <a href="https://www.flaticon.com/" title="Flaticon">www.flaticon.com</a>
 
