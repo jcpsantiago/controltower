@@ -11,19 +11,23 @@
 
 
 ;; Utility functions ;;
-(defn csv-data->maps [csv-data]
+(defn csv-data->maps
+  [csv-data]
   (println "Parsing csv into maps...")
   (map zipmap
-       (->> (first csv-data) 
-            (map keyword) 
-            repeat)
+    (->> (first csv-data)
+         (map keyword)
+         repeat)
     (rest csv-data)))
 
 
 (defn code-map
   "Nests a map using a kv from the map as the top-level keyword."
   [target-k m]
-  (let [k (-> m target-k s/lower-case keyword)]
+  (let [k (-> m
+              target-k
+              s/lower-case
+              keyword)]
     {k m}))
 
 
@@ -35,8 +39,9 @@
   (->> "../resources/airline-colors-serialized.csv"
        slurp
        csv/read-csv
-       (map (fn [[k v]] {(keyword (s/lower-case k)) 
-                         {:main-color (re-find #"#[0-9A-Z]{6}" v)}}))
+       (map (fn [[k v]]
+              {(keyword (s/lower-case k)) {:main-color (re-find #"#[0-9A-Z]{6}"
+                                                                v)}}))
        (into {})))
 
 
@@ -50,24 +55,28 @@
     (let [full-url (str stack-url "?access_key=" stack-api-key "&offset=")
           ; need to query the API first to know what's the total n
           first-url (str full-url 0)
-          first-res (-> first-url curl/get :body (json/parse-string true))
+          first-res (-> first-url
+                        curl/get
+                        :body
+                        (json/parse-string true))
           first-data (:data first-res)
           offset-seq (as-> first-res $
-                           (:pagination $)
-                           (:total $)
-                           (range 1 $ 100)
-                           (drop 1 $))
+                       (:pagination $)
+                       (:total $)
+                       (range 1 $ 100)
+                       (drop 1 $))
           url-seq (map #(str full-url %) offset-seq)]
-      (reduce (fn [p c]
-               (let [res (-> c 
-                             curl/get 
-                             :body 
-                             (json/parse-string true) 
-                             :data)] 
-                (println c)
-                (reduce conj p res)))
-              first-data
-              url-seq))))
+      (reduce
+        (fn [p c]
+          (let [res (-> c
+                        curl/get
+                        :body
+                        (json/parse-string true)
+                        :data)]
+            (println c)
+            (reduce conj p res)))
+        first-data
+        url-seq))))
 
 
 ;; Can't use the API more than 500 calls/month
@@ -76,38 +85,39 @@
 ;      (spit "./stack-airlines-dump.edn"))
 
 
-(defn merge-maps 
+(defn merge-maps
   "Merges two nested maps with the same top-level keyword."
   [mapy [k v]]
   {k (conj v (k mapy))})
-  
+
 (def merge-colors (partial merge-maps airline-colors))
 
 (def airlines-with-missing
-  ;; Lufthansa (non-cargo) is stragenly missing from the aviationstack data ¯\_(ツ)_/¯
-  (conj stack-airlines {:date_founded "1953" 
-                        :fleet_average_age "missing"
-                        :fleet_size "missing"
-                        :country_iso2 "DE"
-                        :iata_prefix_accounting "LH"
-                        :airline_name "Lufthansa"
-                        :type "Scheduled"
-                        :callsign "LUFTHANSA"
-                        :country_name "Germany"
-                        :status "active"
-                        :iata_code "LH"
-                        :icao_code "DLH"
-                        :hub_code "FRA"}))
+  ;; Lufthansa (non-cargo) is stragenly missing from the aviationstack data
+  ;; ¯\_(ツ)_/¯
+  (conj stack-airlines
+        {:date_founded "1953",
+         :fleet_average_age "missing",
+         :fleet_size "missing",
+         :country_iso2 "DE",
+         :iata_prefix_accounting "LH",
+         :airline_name "Lufthansa",
+         :type "Scheduled",
+         :callsign "LUFTHANSA",
+         :country_name "Germany",
+         :status "active",
+         :iata_code "LH",
+         :icao_code "DLH",
+         :hub_code "FRA"}))
 
-(def airlines-icao (->> airlines-with-missing 
-                        (filter #(and 
-                                   (seq (:icao_code %)) 
-                                   (= (:status %) "active")))
-                        (map #(code-map :icao_code %)) 
-                        (filter #(contains? airline-colors (first (keys %)))) 
-                        (into {})
-                        (map merge-colors)
-                        (into {})))
+(def airlines-icao
+  (->> airlines-with-missing
+       (filter #(and (seq (:icao_code %)) (= (:status %) "active")))
+       (map #(code-map :icao_code %))
+       (filter #(contains? airline-colors (first (keys %))))
+       (into {})
+       (map merge-colors)
+       (into {})))
 
 
 (println "Saving airlines db...")
@@ -122,29 +132,49 @@
 (def root-path "../resources/airplanes/")
 
 
-(defn spit-airplane [root-path coll] 
-  (doseq [[k v] coll]
-    (spit (str root-path "svg/" (name k) ".svg") v)))
+(defn spit-airplane
+  [root-path coll]
+  (doseq [[k v] coll] (spit (str root-path "svg/" (name k) ".svg") v)))
 
 
 (->> airlines-icao
-     (map (fn [[k v]] 
-            [k (s/replace airplane-svg "#5d9cec" (:main-color v))])) 
+     (map (fn [[k v]] [k (s/replace airplane-svg "#5d9cec" (:main-color v))]))
      (spit-airplane root-path))
 
 
-(defn ready-png-airplanes [root-path airline] 
+(defn ready-png-airplanes
+  [root-path airline]
   (let [icao (name (first airline))]
     (println "Converting " icao " to PNG")
-    (shell/sh "bash" "-c"
-              (str "rsvg-convert -h 100 " root-path "svg/" icao ".svg > "
-                   root-path "png/base/" icao ".png"))
-    (doseq [angle (range 0 360 12)] 
+    (shell/sh "bash"
+              "-c"
+              (str "rsvg-convert -h 100 "
+                   root-path
+                   "svg/"
+                   icao
+                   ".svg > "
+                   root-path
+                   "png/base/"
+                   icao
+                   ".png"))
+    (doseq [angle (range 0 360 12)]
       (println "Rotating " icao " with angle " angle)
-      (shell/sh "bash" "-c"
-                (str "convert " root-path "png/base/" icao ".png "
-                     "-distort ScaleRotateTranslate " angle
-                     " +repage " root-path "png/rotations/" icao "_" angle ".png")))))
+      (shell/sh "bash"
+                "-c"
+                (str "convert "
+                     root-path
+                     "png/base/"
+                     icao
+                     ".png "
+                     "-distort ScaleRotateTranslate "
+                     angle
+                     " +repage "
+                     root-path
+                     "png/rotations/"
+                     icao
+                     "_"
+                     angle
+                     ".png")))))
 
 
 (println "Converting SVG airplanes to PNG and rotating...")
@@ -153,30 +183,31 @@
 
 (println "")
 ;; Airport data ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn all-airports []
+(defn all-airports
+  []
   (println "Getting airport data from ourairports.com...")
   (-> "https://ourairports.com/data/airports.csv"
       curl/get
       :body))
 
 
-(defn airports-to-keep [airports-map] 
+(defn airports-to-keep
+  [airports-map]
   (println "Keeping airports with scheduled services...")
   (->> airports-map
        ;; only scheduled flights for now so no helipads sorry : (
-       (filter #(and (seq (:iata_code %)) 
-                     (= (:scheduled_service %) "yes")))
-       (pmap #(select-keys % [:type :name :latitude_deg :longitude_deg :elevation_ft
-                              :iso_country :municipality :iata_code :ident]))
+       (filter #(and (seq (:iata_code %)) (= (:scheduled_service %) "yes")))
+       (pmap
+         #(select-keys %
+                       [:type :name :latitude_deg :longitude_deg :elevation_ft
+                        :iso_country :municipality :iata_code :ident]))
        (into [])))
 
 
 ;; https://stackoverflow.com/questions/12448629/create-a-bounding-box-around-the-geo-point
 (defn calc-latitude-dif
   [radius]
-  (*
-   (Math/asin (/ radius 6378000))
-   (/ 180 Math/PI)))
+  (* (Math/asin (/ radius 6378000)) (/ 180 Math/PI)))
 
 
 (defn calc-longitude-dif
@@ -205,12 +236,11 @@
         latmax (max lat+ lat-)
         lonmin (min lon+ lon-)
         lonmax (max lon+ lon-)]
-     (conj airport [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])))
+    (conj airport
+          [:boundingbox (str latmax "," latmin "," lonmin "," lonmax)])))
 
 
-(defn checkpoint-bounding-boxes [x]
-  (println "Generating bounding boxes...")
-  x)
+(defn checkpoint-bounding-boxes [x] (println "Generating bounding boxes...") x)
 
 
 (->> (all-airports)
