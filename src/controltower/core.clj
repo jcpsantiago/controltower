@@ -292,9 +292,10 @@
                          keyword)
             airline-name (get-in airlines-icao [callsign :airline_name])
             plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
-            ; FIXME: there is no `default` at the moment..
-            plane-url (str (utils/replace-airline-icao airplane-img-url
-                                                       (name callsign))
+            plane-url (str (if (empty? callsign)
+                             (utils/replace-airline-icao airplane-img-url "zzz")
+                             (utils/replace-airline-icao airplane-img-url
+                                                         (name callsign)))
                            "_"
                            (apply int plane-angle)
                            ".png")]

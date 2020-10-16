@@ -42,7 +42,8 @@
        (map (fn [[k v]]
               {(keyword (s/lower-case k)) {:main-color (re-find #"#[0-9A-Z]{6}"
                                                                 v)}}))
-       (into {})))
+       (into {})
+       (conj {:zzz {:main-color "#6af1dd"}})))
 
 
 (def stack-api-key (System/getenv "AVIATIONSTACK_API_KEY"))
@@ -95,20 +96,34 @@
 (def airlines-with-missing
   ;; Lufthansa (non-cargo) is stragenly missing from the aviationstack data
   ;; ¯\_(ツ)_/¯
-  (conj stack-airlines
-        {:date_founded "1953",
-         :fleet_average_age "missing",
-         :fleet_size "missing",
-         :country_iso2 "DE",
-         :iata_prefix_accounting "LH",
-         :airline_name "Lufthansa",
-         :type "Scheduled",
-         :callsign "LUFTHANSA",
-         :country_name "Germany",
-         :status "active",
-         :iata_code "LH",
-         :icao_code "DLH",
-         :hub_code "FRA"}))
+  ;; also adds a "default" map for cases where the ICAO callsign is missing
+  (-> stack-airlines
+      (conj {:date_founded "1953",
+             :fleet_average_age "missing",
+             :fleet_size "missing",
+             :country_iso2 "DE",
+             :iata_prefix_accounting "LH",
+             :airline_name "Lufthansa",
+             :type "Scheduled",
+             :callsign "LUFTHANSA",
+             :country_name "Germany",
+             :status "active",
+             :iata_code "LH",
+             :icao_code "DLH",
+             :hub_code "FRA"})
+      (conj {:date_founded "irrelevant",
+             :fleet_average_age "irrelevant",
+             :fleet_size "irrelevant",
+             :country_iso2 "irrelevant",
+             :iata_prefix_accounting "irrelevant",
+             :airline_name "DEFAULT",
+             :type "irrelevant",
+             :callsign "DEFAULT",
+             :country_name "Caprica",
+             :status "active",
+             :iata_code "irrelevant",
+             :icao_code "ZZZ",
+             :hub_code "irrelevant"})))
 
 (def airlines-icao
   (->> airlines-with-missing
