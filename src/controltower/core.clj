@@ -193,10 +193,10 @@
   [flight-data]
   (if (empty? flight-data)
     (do (timbre/info "No flights found, returning empty map instead") {})
-    (do
-      (timbre/info "Converting stats to the metric system")
-      (assoc-in flight-data [:altitude] (int (* (:altitude flight-data) 3.281)))
-      (assoc-in flight-data [:speed] (int (* (:speed flight-data) 1.852))))))
+    (do (timbre/info "Converting stats to the metric system")
+        (-> flight-data
+            (assoc-in [:altitude] (int (* (:altitude flight-data) 3.281)))
+            (assoc-in [:speed] (int (* (:speed flight-data) 1.852)))))))
 
 (defn create-flight-str
   "Creates a string with information about the flight"
