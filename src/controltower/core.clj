@@ -17,7 +17,9 @@
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [taoensso.timbre :as timbre]
             [next.jdbc.sql :as sql]
-            [next.jdbc.result-set :as sql-builders])
+            [next.jdbc.result-set :as sql-builders]
+            [clojure.spec.alpha :as spec]
+            [clojure.spec.test.alpha :as stest])
   (:gen-class))
 
 ; Temporary measure until httpkit enables SNI by default
@@ -102,6 +104,7 @@
   [url]
   (json/parse-string (:body @(http/get url)) true))
 
+
 (defn get-weather!
   "Get current weather condition for a city"
   [latitude longitude]
@@ -110,6 +113,15 @@
            "&lon=" longitude
            "&appid=" openweather-api-key)
       get-api-data!))
+
+(spec/def ::latitude (spec/and number? #(<= % 90) #(>= % -90)))
+(spec/def ::longitude (spec/and number? #(<= % 80) #(>= % -180)))
+
+(spec/fdef get-weather!
+  :args (spec/cat :latitude ::latitude
+                  :longitude ::longitude)
+  :ret map?)
+
 
 (defn get-weather-description
   "Get description for current weather from openweather API response"
@@ -130,6 +142,8 @@
   "Remove irrelevant fields from flightradar24"
   [flight-data]
   (dissoc flight-data :full_count :version))
+
+
 
 ;; with tips from @seancorfield
 (defn f24-with-keywords
@@ -193,10 +207,10 @@
   [flight-data]
   (if (empty? flight-data)
     (do (timbre/info "No flights found, returning empty map instead") {})
-    (do
-      (timbre/info "Converting stats to the metric system")
-      (assoc-in flight-data [:altitude] (int (* (:altitude flight-data) 3.281)))
-      (assoc-in flight-data [:speed] (int (* (:speed flight-data) 1.852))))))
+    (do (timbre/info "Converting stats to the metric system")
+        (-> flight-data
+            (assoc-in [:altitude] (int (* (:altitude flight-data) 3.281)))
+            (assoc-in [:speed] (int (* (:speed flight-data) 1.852)))))))
 
 (defn create-flight-str
   "Creates a string with information about the flight"
@@ -252,88 +266,122 @@
        ",0,0/400x300?attribution=false&logo=false&access_token="
          mapbox-api-key))
 
-(defn create-payload
-  "Create a map to be converted into JSON for POST"
-  [flight airport]
-  (let [airport-coords (iata->coords airport)
-        airport-lon (:longitude_deg airport-coords)
-        airport-lat (:latitude_deg airport-coords)
-        weather-response (future (get-weather! airport-lat airport-lon))
-        airport-iata (upper-case (name airport))
+(defn noflight-payload
+  "Create payload with image of airport and weather, when there is no flight"
+  [airport weather-response airport-lat airport-lon]
+  (let [airport-iata (upper-case (name airport))
         airport-name (iata->name airport)
-        night-mode (utils/night? @weather-response)]
-    (if (empty? flight)
-      (let [weather-description (get-weather-description @weather-response)]
-        {:blocks
-           [{:type "section",
-             :text {:type "mrkdwn",
-                    :text (str "<https://www.openstreetmap.org/#map=14/"
-                               airport-lat
-                               "/"
-                               airport-lon
-                               " | "
-                               airport-name
-                               ">"
-                               " tower observes "
-                               weather-description
-                               ", no air traffic, over.")}}
-            {:type "image",
-             :title {:type "plain_text",
-                     :text (str airport-iata " airport"),
-                     :emoji true},
-             :image_url
-               (create-mapbox-str nil airport-lon airport-lat night-mode true),
-             :alt_text (str airport-iata " airport")}]})
-      (let [flight-lon (:lon flight)
-            flight-lat (:lat flight)
-            callsign (-> flight
-                         :icao-callsign
-                         lower-case
-                         keyword)
-            airline-name (get-in airlines-icao [callsign :airline_name])
-            plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
-            ; FIXME: there is no `default` at the moment..
-            plane-url (str (utils/replace-airline-icao airplane-img-url
-                                                       (name callsign))
-                           "_"
-                           (apply int plane-angle)
-                           ".png")]
-        (timbre/info (str "Creating payload for " flight))
-        {:blocks
-           [{:type "section",
-             :text {:type "mrkdwn",
-                    :text (create-flight-str flight airport-iata airline-name)}}
-            {:type "image",
-             :title {:type "plain_text",
-                     :text (or (:flight flight) "Flight location"),
-                     :emoji true},
-             :image_url (create-mapbox-str plane-url
-                                           flight-lon
-                                           flight-lat
-                                           night-mode
-                                           false),
-             :alt_text "flight overview"}]}))))
+        night-mode (utils/night? weather-response)
+        weather-description (get-weather-description weather-response)]
+    {:blocks
+       [{:type "section",
+         :text {:type "mrkdwn",
+                :text (str "<https://www.openstreetmap.org/#map=14/"
+                           airport-lat
+                           "/"
+                           airport-lon
+                           " | "
+                           airport-name
+                           ">"
+                           " tower observes "
+                           weather-description
+                           ", no air traffic, over.")}}
+        {:type "image",
+         :title {:type "plain_text",
+                 :text (str airport-iata " airport"),
+                 :emoji true},
+         :image_url
+           (create-mapbox-str nil airport-lon airport-lat night-mode true),
+         :alt_text (str airport-iata " airport")}]}))
 
-(defn flight!
-  [airport direction]
-  (let [coordinates (get-bounding-box all-airports airport)]
-    (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
-    (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
-             coordinates)
-        get-api-data!
-        remove-crud
-        f24-with-keywords
-        onair-flights
-        (filter-direction airport direction)
-        random-flight
-        metric-system-vals)))
+(defn withflight-payload
+  "Create payload with image of airplane with map of the flight coordinates"
+  [flight airport weather-response]
+  (let [flight-lon (:lon flight)
+        flight-lat (:lat flight)
+        airport-iata (upper-case (name airport))
+        night-mode (utils/night? @weather-response)
+        callsign (-> flight
+                     :icao-callsign
+                     lower-case
+                     keyword)
+        airline-name (get-in airlines-icao [callsign :airline_name])
+        plane-angle (utils/closest-int (:track flight) 1 airplane-angles)
+        plane-url (str (if (empty? airline-name)
+                         (utils/replace-airline-icao airplane-img-url "zzz")
+                         (utils/replace-airline-icao airplane-img-url
+                                                     (name callsign)))
+                       "_"
+                       (apply int plane-angle)
+                       ".png")]
+    (timbre/info (str "Creating payload for " flight))
+    {:blocks
+       [{:type "section",
+         :text {:type "mrkdwn",
+                :text (create-flight-str flight airport-iata airline-name)}}
+        {:type "image",
+         :title {:type "plain_text",
+                 :text (or (:flight flight) "Flight location"),
+                 :emoji true},
+         :image_url
+           (create-mapbox-str plane-url flight-lon flight-lat night-mode false),
+         :alt_text "flight overview"}]}))
+
+; STUFF FOR
+; SPEC!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+; (spec/def ::config (spec/*
+;                      (spec/cat :foo string?
+;                                :bar  (spec/alt :s string? :b boolean?))))
+; (spec/conform ::config ["-server" "foo" "-verbose" true "-user" "joe"])
+
+; (defn- set-config [prop val]
+;   ;; dummy fn
+;   (println "set" prop val))
+
+; (defn configure [input]
+;   (let [parsed (spec/conform ::config input)]
+;     (if (= parsed ::spec/invalid)
+;       (throw (ex-info "Invalid input" (spec/explain-data ::config input)))
+;       (for [{prop :foo [_ val] :bar} parsed]
+;         (set-config (subs prop 1) val)))))
+
+; (configure ["-server" "foo" "-verbose" true "-user" "joe"])
+
+; (def coord (get-bounding-box all-airports :jfk))
+; (def f24res
+;     (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
+;              coord)
+;         get-api-data!))
+
+
+(defn get-flight!
+  [airport coordinates]
+  (timbre/info "Checking for flights at" airport "at coordinates" coordinates)
+  (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
+           coordinates)
+      get-api-data!
+      remove-crud))
 
 (defn post-all-airports-flight!
   "Gets flight, create string and post it to Slack"
   [airport direction response-url]
-  (-> (flight! airport direction)
-      (create-payload airport)
-      (post-to-slack! response-url)))
+  (let [coordinates (get-bounding-box all-airports airport)
+        airport-coords (iata->coords airport)
+        airport-lon (:longitude_deg airport-coords)
+        airport-lat (:latitude_deg airport-coords)
+        weather-response (future (get-weather! airport-lat airport-lon))
+        flight (get-flight! airport coordinates)]
+    (if (empty? flight)
+      (-> (noflight-payload airport weather-response airport-lat airport-lon)
+          (post-to-slack! response-url))
+      (let [clean-flight (-> flight
+                             f24-with-keywords
+                             onair-flights
+                             (filter-direction airport direction)
+                             random-flight
+                             metric-system-vals)]
+        (-> (withflight-payload clean-flight airport weather-response)
+            (post-to-slack! response-url))))))
 
 (defn request-airport-iata
   [ks user-id]
@@ -490,7 +538,9 @@
                         (upper-case airport-str))
                    "...")
       (cond
-        (= request-type "help")
+        (=
+          request-type
+          "help"
           (do
             (timbre/info (str "Slack user " user-id
                               " (" user-name
@@ -505,40 +555,43 @@
                    "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
                  "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight\n"
                    "- use `random` to spot at a random airport in the world e.g. `/spot random`")})
-        (= request-type "airport")
-          (do (timbre/info
-                (str "request_id:" request-id " saving request in database"))
-              (sql/insert! db/ds
-                           :requests
-                           {:id request-id,
-                            :user_id user-id,
-                            :team_domain (:team_domain request),
-                            :team_id (:team_id request),
-                            :channel_id (:channel_id request),
-                            :channel_name (:channel_name request),
-                            :airport airport-str,
-                            :direction (name direction),
-                            :is_retry 0})
-              (which-flight-allairports user-id airport direction request))
-        (= request-type "city")
-          (do (timbre/info (str "Slack user "
-                                user-id
-                                " is checking for airports at "
-                                airport-str
-                                "..."))
-              (let [ks (string->airportname :municipality airport-str)]
-                (if (seq ks)
-                  (do (thread (post-to-slack! (request-airport-iata ks user-id)
-                                              (:response_url request)))
-                      {:status 200, :body ""})
-                  (do (timbre/warn airport " is not known!")
-                      {:status 200,
-                       :body (str "User "
-                                  user-id
-                                  " please say again. ATC does not know "
-                                  "`"
-                                  airport-str
-                                  "`")})))))))
+          (= request-type
+             "airport"
+             (do (timbre/info
+                   (str "request_id:" request-id " saving request in database"))
+                 (sql/insert! db/ds
+                              :requests
+                              {:id request-id,
+                               :user_id user-id,
+                               :team_domain (:team_domain request),
+                               :team_id (:team_id request),
+                               :channel_id (:channel_id request),
+                               :channel_name (:channel_name request),
+                               :airport airport-str,
+                               :direction (name direction),
+                               :is_retry 0})
+                 (which-flight-allairports user-id airport direction request)))
+          (= request-type
+             "city"
+             (do
+               (timbre/info (str "Slack user "
+                                 user-id
+                                 " is checking for airports at "
+                                 airport-str
+                                 "..."))
+               (let [ks (string->airportname :municipality airport-str)]
+                 (if (seq ks)
+                   (do (thread (post-to-slack! (request-airport-iata ks user-id)
+                                               (:response_url request)))
+                       {:status 200, :body ""})
+                   (do (timbre/warn airport " is not known!")
+                       {:status 200,
+                        :body (str "User "
+                                   user-id
+                                   " please say again. ATC does not know "
+                                   "`"
+                                   airport-str
+                                   "`")})))))))))
   (POST "/which-flight-retry"
         req
         (let [request-id (utils/uuid)
