@@ -538,9 +538,7 @@
                         (upper-case airport-str))
                    "...")
       (cond
-        (=
-          request-type
-          "help"
+        (= request-type "help")
           (do
             (timbre/info (str "Slack user " user-id
                               " (" user-name
@@ -555,43 +553,40 @@
                    "- `[airport]` can be either a IATA code such as `TXL` or a city (in english) like `Berlin`\n"
                  "- `[direction]` can be `arriving` or `departing` or nothing to see any visible flight\n"
                    "- use `random` to spot at a random airport in the world e.g. `/spot random`")})
-          (= request-type
-             "airport"
-             (do (timbre/info
-                   (str "request_id:" request-id " saving request in database"))
-                 (sql/insert! db/ds
-                              :requests
-                              {:id request-id,
-                               :user_id user-id,
-                               :team_domain (:team_domain request),
-                               :team_id (:team_id request),
-                               :channel_id (:channel_id request),
-                               :channel_name (:channel_name request),
-                               :airport airport-str,
-                               :direction (name direction),
-                               :is_retry 0})
-                 (which-flight-allairports user-id airport direction request)))
-          (= request-type
-             "city"
-             (do
-               (timbre/info (str "Slack user "
-                                 user-id
-                                 " is checking for airports at "
-                                 airport-str
-                                 "..."))
-               (let [ks (string->airportname :municipality airport-str)]
-                 (if (seq ks)
-                   (do (thread (post-to-slack! (request-airport-iata ks user-id)
-                                               (:response_url request)))
-                       {:status 200, :body ""})
-                   (do (timbre/warn airport " is not known!")
-                       {:status 200,
-                        :body (str "User "
-                                   user-id
-                                   " please say again. ATC does not know "
-                                   "`"
-                                   airport-str
-                                   "`")})))))))))
+        (= request-type "airport")
+          (do (timbre/info
+                (str "request_id:" request-id " saving request in database"))
+              (sql/insert! db/ds
+                           :requests
+                           {:id request-id,
+                            :user_id user-id,
+                            :team_domain (:team_domain request),
+                            :team_id (:team_id request),
+                            :channel_id (:channel_id request),
+                            :channel_name (:channel_name request),
+                            :airport airport-str,
+                            :direction (name direction),
+                            :is_retry 0})
+              (which-flight-allairports user-id airport direction request))
+        :else
+          (do (timbre/info (str "Slack user "
+                                user-id
+                                " is checking for airports at "
+                                airport-str
+                                "..."))
+              (let [ks (string->airportname :municipality airport-str)]
+                (if (seq ks)
+                  (do (thread (post-to-slack! (request-airport-iata ks user-id)
+                                              (:response_url request)))
+                      {:status 200, :body ""})
+                  (do (timbre/warn airport " is not known!")
+                      {:status 200,
+                       :body (str "User "
+                                  user-id
+                                  " please say again. ATC does not know "
+                                  "`"
+                                  airport-str
+                                  "`")})))))))
   (POST "/which-flight-retry"
         req
         (let [request-id (utils/uuid)
