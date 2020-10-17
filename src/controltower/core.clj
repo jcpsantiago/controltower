@@ -178,9 +178,6 @@
 
 (defn filter-direction
   [flight-data airport direction]
-  (when (empty? flight-data)
-    (timbre/info "No flights to filter, returning empty map.")
-    {})
   (timbre/info "Filtering for flights in direction" (name direction))
   (if (= direction :any)
     (do (timbre/info
@@ -197,20 +194,16 @@
 
 (defn random-flight
   [flight-data]
-  (if (empty? flight-data)
-    (do (timbre/info "No flights found, returning empty map instead") {})
-    (let [rand-flight-k (rand-nth (keys flight-data))]
-      (timbre/info "Returning random flight" rand-flight-k)
-      (rand-flight-k flight-data))))
+  (let [rand-flight-k (rand-nth (keys flight-data))]
+    (timbre/info "Returning random flight" rand-flight-k)
+    (rand-flight-k flight-data)))
 
 (defn metric-system-vals
   [flight-data]
-  (if (empty? flight-data)
-    (do (timbre/info "No flights found, returning empty map instead") {})
-    (do (timbre/info "Converting stats to the metric system")
-        (-> flight-data
-            (assoc-in [:altitude] (int (* (:altitude flight-data) 3.281)))
-            (assoc-in [:speed] (int (* (:speed flight-data) 1.852)))))))
+  (timbre/info "Converting stats to the metric system")
+  (-> flight-data
+      (assoc-in [:altitude] (int (* (:altitude flight-data) 3.281)))
+      (assoc-in [:speed] (int (* (:speed flight-data) 1.852)))))
 
 (defn create-flight-str
   "Creates a string with information about the flight"
@@ -374,14 +367,19 @@
     (if (empty? flight)
       (-> (noflight-payload airport weather-response airport-lat airport-lon)
           (post-to-slack! response-url))
-      (let [clean-flight (-> flight
-                             f24-with-keywords
-                             onair-flights
-                             (filter-direction airport direction)
-                             random-flight
-                             metric-system-vals)]
-        (-> (withflight-payload clean-flight airport weather-response)
-            (post-to-slack! response-url))))))
+      (let [onair-flights-coll (-> flight
+                                   f24-with-keywords
+                                   onair-flights)]
+        (if (empty? onair-flights-coll)
+          (->
+            (noflight-payload airport weather-response airport-lat airport-lon)
+            (post-to-slack! response-url))
+          (let [clean-flight (-> onair-flights-coll
+                                 (filter-direction airport direction)
+                                 random-flight
+                                 metric-system-vals)]
+            (-> (withflight-payload clean-flight airport weather-response)
+                (post-to-slack! response-url))))))))
 
 (defn request-airport-iata
   [ks user-id]
