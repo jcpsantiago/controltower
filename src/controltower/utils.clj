@@ -2,8 +2,15 @@
   (:require [cheshire.core :as json]
             [clojure.java.io :as io]
             [taoensso.timbre :as timbre]
-            [clojure.string :as s])
+            [clojure.string :as s]
+            [clojure.spec.alpha :as spec])
   (:gen-class))
+
+(import 'org.apache.commons.validator.routines.UrlValidator)
+
+(defn valid-url?
+  [url-str]
+  (let [validator (UrlValidator.)] (.isValid validator url-str)))
 
 (defn uuid [] (.toString (java.util.UUID/randomUUID)))
 
@@ -42,14 +49,18 @@
     (timbre/error "Failed, exception is" body)
     (timbre/info (str service " async HTTP " type " success: ") status)))
 
+
+(spec/fdef night?
+  :args (spec/cat :weather-response
+                  ::openweather)
+  :ret boolean?)
+
 (defn night?
   "Determine if it's night or day based on openweather API response"
+  {:pre #(spec/valid? ::openweather %), :post #(boolean? %)}
   [weather-response]
-  (let [sys (:sys weather-response)
-        localtime (:dt weather-response)
-        sunrise (:sunrise sys)
-        sunset (:sunset sys)]
-    (or (< localtime sunrise) (> localtime sunset))))
+  (let [{:keys [dt sunrise sunset]} weather-response]
+    (or (< dt sunrise) (> dt sunset))))
 
 
 (defn help-response

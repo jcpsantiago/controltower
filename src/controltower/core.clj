@@ -5,6 +5,7 @@
             [clojure.core.async :refer [thread]]
             [clojure.string :refer [trim join split lower-case upper-case]]
             [clojure.walk :refer [keywordize-keys]]
+            [clojure.set :refer [rename-keys]]
             [compojure.core :refer [defroutes GET POST]]
             [compojure.route :as route]
             [controltower.db :as db]
@@ -18,9 +19,9 @@
             [taoensso.timbre :as timbre]
             [next.jdbc.sql :as sql]
             [next.jdbc.result-set :as sql-builders]
-            [clojure.spec.alpha :as spec]
-            [clojure.spec.test.alpha :as stest])
+            [clojure.spec.alpha :as spec])
   (:gen-class))
+
 
 ; Temporary measure until httpkit enables SNI by default
 (alter-var-root #'org.httpkit.client/*default-client*
@@ -83,11 +84,19 @@
   [iata]
   (get-in all-airports [iata :municipality]))
 
+
+(spec/fdef iata->coords
+  :args (spec/cat :iata
+                  :controltower.spec/iata)
+  :ret (spec/keys :req-un
+                  [:controltower.spec/latitude :controltower.spec/longitude]))
+
 (defn iata->coords
   "Converts a IATA code to the coordinates of the airport"
   [iata]
   (-> (iata all-airports)
-      (select-keys [:latitude_deg :longitude_deg])))
+      (select-keys [:latitude_deg :longitude_deg])
+      (rename-keys {:latitude_deg :latitude, :longitude_deg :longitude})))
 
 (defn iata->name [iata] (get-in all-airports [iata :name]))
 
@@ -101,38 +110,39 @@
 
 (defn get-api-data!
   "GET an API and pull only the body"
+  {:pre #(utils/valid-url? %), :post map?}
   [url]
   (json/parse-string (:body @(http/get url)) true))
 
 
-(defn get-weather!
-  "Get current weather condition for a city"
-  [latitude longitude]
-  (timbre/info "Checking the weather...")
-  (-> (str "http://api.openweathermap.org/data/2.5/weather?lat=" latitude
-           "&lon=" longitude
-           "&appid=" openweather-api-key)
-      get-api-data!))
-
-(spec/def ::latitude (spec/and number? #(<= % 90) #(>= % -90)))
-(spec/def ::longitude (spec/and number? #(<= % 80) #(>= % -180)))
-
 (spec/fdef get-weather!
   :args (spec/cat :latitude ::latitude
                   :longitude ::longitude)
-  :ret map?)
+  :ret ::openweather)
 
+(defn get-weather!
+  "Get current weather condition for a city"
+  {:post #(spec/valid? ::openweather %)}
+  [latitude longitude]
+  (timbre/info "Checking the weather...")
+  (let [res (-> (str "http://api.openweathermap.org/data/2.5/weather?lat="
+                       latitude
+                     "&lon=" longitude
+                     "&appid=" openweather-api-key)
+                get-api-data!)
+        sel (select-keys res [:weather :dt :sys])]
+    (conj {}
+          (-> sel
+              :weather
+              first
+              (select-keys [:description]))
+          (select-keys sel [:dt])
+          (select-keys (:sys sel) [:sunrise :sunset]))))
 
-(defn get-weather-description
-  "Get description for current weather from openweather API response"
-  [weather-response]
-  (-> weather-response
-      :weather
-      first
-      :description))
 
 (defn create-gmaps-str
   "Creates the url needed for geocoding an address with google maps API"
+  {:post #(utils/valid-url? %)}
   [latitude longitude]
   (str "https://maps.googleapis.com/maps/api/geocode/json?latlng=" latitude
        "," longitude
@@ -246,6 +256,7 @@
 
 (defn create-mapbox-str
   "Creates mapbox string for image with map and airplane"
+  {:post #(utils/valid-url? %)}
   [image-url longitude latitude night-mode only-airport]
   (str "https://api.mapbox.com/styles/v1/mapbox/"
        (if night-mode "dark-v10" "streets-v11")
@@ -264,8 +275,7 @@
   [airport weather-response airport-lat airport-lon]
   (let [airport-iata (upper-case (name airport))
         airport-name (iata->name airport)
-        night-mode (utils/night? weather-response)
-        weather-description (get-weather-description weather-response)]
+        night-mode (utils/night? weather-response)]
     {:blocks
        [{:type "section",
          :text {:type "mrkdwn",
@@ -277,7 +287,9 @@
                            airport-name
                            ">"
                            " tower observes "
-                           weather-description
+                           (-> weather-response
+                               :description
+                               lower-case)
                            ", no air traffic, over.")}}
         {:type "image",
          :title {:type "plain_text",
@@ -293,7 +305,7 @@
   (let [flight-lon (:lon flight)
         flight-lat (:lat flight)
         airport-iata (upper-case (name airport))
-        night-mode (utils/night? @weather-response)
+        night-mode (utils/night? weather-response)
         callsign (-> flight
                      :icao-callsign
                      lower-case
@@ -320,32 +332,6 @@
            (create-mapbox-str plane-url flight-lon flight-lat night-mode false),
          :alt_text "flight overview"}]}))
 
-; STUFF FOR
-; SPEC!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-; (spec/def ::config (spec/*
-;                      (spec/cat :foo string?
-;                                :bar  (spec/alt :s string? :b boolean?))))
-; (spec/conform ::config ["-server" "foo" "-verbose" true "-user" "joe"])
-
-; (defn- set-config [prop val]
-;   ;; dummy fn
-;   (println "set" prop val))
-
-; (defn configure [input]
-;   (let [parsed (spec/conform ::config input)]
-;     (if (= parsed ::spec/invalid)
-;       (throw (ex-info "Invalid input" (spec/explain-data ::config input)))
-;       (for [{prop :foo [_ val] :bar} parsed]
-;         (set-config (subs prop 1) val)))))
-
-; (configure ["-server" "foo" "-verbose" true "-user" "joe"])
-
-; (def coord (get-bounding-box all-airports :jfk))
-; (def f24res
-;     (-> (str "https://data-live.flightradar24.com/zones/fcgi/feed.js?bounds="
-;              coord)
-;         get-api-data!))
-
 
 (defn get-flight!
   [airport coordinates]
@@ -360,9 +346,9 @@
   [airport direction response-url]
   (let [coordinates (get-bounding-box all-airports airport)
         airport-coords (iata->coords airport)
-        airport-lon (:longitude_deg airport-coords)
-        airport-lat (:latitude_deg airport-coords)
-        weather-response (future (get-weather! airport-lat airport-lon))
+        airport-lon (:longitude airport-coords)
+        airport-lat (:latitude airport-coords)
+        weather-response (get-weather! airport-lat airport-lon)
         flight (get-flight! airport coordinates)]
     (if (empty? flight)
       (-> (noflight-payload airport weather-response airport-lat airport-lon)
